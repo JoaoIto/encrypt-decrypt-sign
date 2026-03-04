@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    command: npm run dev --workspace=apps/web
+
+  cipher-vm:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3001:3001"
+    command: npm run dev --workspace=apps/cipher-service
+
+  hash-vm:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3002:3002"
+    command: npm run dev --workspace=apps/hash-service
+
+  sym-crypto-vm:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3003:3003"
+    command: npm run dev --workspace=apps/sym-crypto-service
+
+  asym-crypto-vm:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3004:3004"
+    command: npm run dev --workspace=apps/asym-crypto-service
+
+  jwt-vm:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3005:3005"
+    command: npm run dev --workspace=apps/jwt-service

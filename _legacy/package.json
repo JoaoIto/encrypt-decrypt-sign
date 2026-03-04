@@ -1,0 +1,22 @@
+{
+  "type": "module",
+  "name": "encrypt-decrypt-sign",
+  "version": "1.0.0",
+  "description": "A arte de criptografar e codificar faz parte da nossa história e essa prática não ficou de fora nas evoluções tecnológicas; por isso que, quando os computadores foram criados, a programação foi pensada como uma forma que facilitasse a comunicação entre pessoas e máquinas.",
+  "main": "cifra.js",
+  "scripts": {
+    "dev": "node ./index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "JoaoIto",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoaoIto/token_nodejs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JoaoIto/token_nodejs/issues"
+  },
+  "homepage": "https://github.com/JoaoIto/token_nodejs#readme"
+}

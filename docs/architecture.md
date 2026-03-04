@@ -29,7 +29,13 @@ O Front-End interage enviando pacotes HTML locais (fetch) por portas reservadas 
 - **Desafio:** As VMs Web Fastify contêm, hoje, a casca das requisições. Contudo, precisamos isolar as lógicas "matemáticas" (como o script exato que roda o Scrypt do Node ou RSA puro) para não misturar HTTP com Código de Segurança real.
 - **Plano de Ação:** Utilizar a subpasta `/packages/crypto-core`. Os scripts de backup em `_legacy` serão exportados no formato `export function encryptAES()`. A biblioteca servirá para publicação aberta (Exemplo: NPM publicar `joao-crypto-core-lib`).
 
-### 5. Automatizações Turborepo (Concluído)
+### 5. Telemetria e Logs das Máquinas Virtuais em Tempo Real (Nova Fase Adicionada)
+- **Desafio:** As VMs operam nos bastidores usando processos paralelos. O usuário não consegue ver os logs do `logger` interno sem abrir múltiplos terminais.
+- **Plano de Ação:** O Next.js (`apps/web/src/app/api/vm`) não apenas irá "acordar" os serviços, mas passará a repassar o fluxo de dados (stdout/stderr) em tempo real para a UI do painel através de variáveis ou Server-Sent Events (SSE).
+
+### 6. Fluxo de Vida Completo: O Processo de Desencriptação (Nova Fase Adicionada)
+- **Desafio:** O dashboard atualmente apenas simula graficamente o envio até o receptor baseando-se no HealthCheck. Para provar o conceito de fato, a requisição deve ser validada por ambos.
+- **Plano de Ação:** Modificar as rotas FastAPI para não possuirem apenas o HealthCheck `/`. Rotas como `POST /encrypt` e `POST /decrypt` serão construídas. O Payload Web fará uma viagem de "ida e volta" pelo `React Flow`. Retornará a Cifra na ida e o texto puro validado na volta. O painel deve pintar o log de cada etapa da matemática de volta!
 - **Desafio:** Subir processos web, APIs isoladas ou a combinação dos dois exige conhecimentos complexos do usuário e múltiplos terminais lado a lado na tela.
 - **Ação Técnica:** Configuramos scripts de automação robustos em `/package.json`, ex: `"dev:sym": "turbo run dev --filter=web --filter=sym-crypto-service"`. Isso invoca a CLI do Turbo: ao detectar esse atalho, o Turbo sobe magicamente em threads duplas de velocidade (evitando compilações redudantes graças ao cache interno `cache: true`) apenas os projetos chamados. 
 

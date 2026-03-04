@@ -2,6 +2,8 @@
 
 Bem-vindo ao **Crypto Visualizer**, um ecossistema projetado para simular, validar e estudar algoritmos essenciais de criptografia sob uma interface visual dinâmica. 
 
+![alt text]({7F600844-32E1-4E89-9ACF-D3B4C5D6095F}.png)
+
 O projeto adota uma arquitetura em **Monorepo** (gerenciada por `TurboRepo` + `npm workspaces`), permitindo que a lógica "crua" e matemática seja desemparelhada das APIs Serverless e consertada em tempo real pelo Front-end Next.js.
 
 ---

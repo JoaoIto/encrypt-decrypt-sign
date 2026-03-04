@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "token",
+  "name": "encrypt-decrypt",
   "version": "1.0.0",
   "description": "",
   "main": "cifra.js",

@@ -3,26 +3,26 @@ import cors from '@fastify/cors';
 import { log, logsHistory } from 'logger';
 import { hashPassword, verifyPassword } from 'crypto-core';
 
-const fastify = Fastify({ logger: true });
-await fastify.register(cors);
+export const app = Fastify({ logger: false }); // Desligado pra teste
+await app.register(cors);
 
-fastify.get('/', async (request, reply) => {
+app.get('/', async (request, reply) => {
     log("Health check pinged");
     return { status: "Hash service is running" };
 });
 
-fastify.get('/logs', async (request, reply) => {
+app.get('/logs', async (request, reply) => {
     return { logs: logsHistory };
 });
 
-fastify.post('/encrypt', async (request, reply) => {
+app.post('/encrypt', async (request, reply) => {
     const { message } = request.body;
     log(`Generating Scrypt Hash with Salt for payload`);
     const hash = hashPassword(message); // Retorna salt:hash
     return { original: message, encrypted: hash, type: "one-way-hash" };
 });
 
-fastify.post('/decrypt', async (request, reply) => {
+app.post('/decrypt', async (request, reply) => {
     const { encrypted, originalQuery } = request.body;
     log(`Validating Hash (Decrypt is impossible, we verify instead)`);
 
@@ -38,11 +38,15 @@ fastify.post('/decrypt', async (request, reply) => {
 
 const start = async () => {
     try {
-        await fastify.listen({ port: 3002 });
+        await app.listen({ port: 3002 });
         console.log("Server listening at http://localhost:3002");
     } catch (err) {
-        fastify.log.error(err);
+        app.log.error(err);
         process.exit(1);
     }
 };
-start();
+
+// Auto-start apenas se o arquivo for rodado diretamente (Ex: npm run dev) e não incluído por vitest
+if (process.argv[1] && process.argv[1].endsWith('index.js')) {
+    start();
+}

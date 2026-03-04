@@ -15,7 +15,8 @@
     "dev:asym": "turbo run dev --filter=web --filter=asym-crypto-service",
     "dev:jwt": "turbo run dev --filter=web --filter=jwt-service",
     "build": "turbo run build",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test": "turbo run test"
   },
   "devDependencies": {
     "turbo": "latest"

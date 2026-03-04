@@ -36,4 +36,4 @@ jobs:
         run: npm run test
 
       - name: Validate System Build
-        run: npm run turbo build
+        run: npm run build

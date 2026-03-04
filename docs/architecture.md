@@ -25,18 +25,40 @@ O objetivo original era modernizar scripts de criptografia (criados inicialmente
 - **Ação Técnica:** Construindo o projeto web em `/apps/web` através do Next.js (App Router), projetou-se uma UI (Interface de Usuário) limpa que consome as APIs. Mais que botões, aplicamos a tecnologia do `@xyflow/react` para plotar geograficamente os serviços. A injeção de classes CSS "Glassmorphism" dá o apelo tátil moderno. 
 O Front-End interage enviando pacotes HTML locais (fetch) por portas reservadas do microserviço e renderiza a saída num console integrado interno.
 
-### 4. A Abstração Final: Bibliotecas "Core" (Próxima Etapa)
-- **Desafio:** As VMs Web Fastify contêm, hoje, a casca das requisições. Contudo, precisamos isolar as lógicas "matemáticas" (como o script exato que roda o Scrypt do Node ou RSA puro) para não misturar HTTP com Código de Segurança real.
-- **Plano de Ação:** Utilizar a subpasta `/packages/crypto-core`. Os scripts de backup em `_legacy` serão exportados no formato `export function encryptAES()`. A biblioteca servirá para publicação aberta (Exemplo: NPM publicar `joao-crypto-core-lib`).
-
-### 5. Telemetria e Logs das Máquinas Virtuais em Tempo Real (Nova Fase Adicionada)
-- **Desafio:** As VMs operam nos bastidores usando processos paralelos. O usuário não consegue ver os logs do `logger` interno sem abrir múltiplos terminais.
-- **Plano de Ação:** O Next.js (`apps/web/src/app/api/vm`) não apenas irá "acordar" os serviços, mas passará a repassar o fluxo de dados (stdout/stderr) em tempo real para a UI do painel através de variáveis ou Server-Sent Events (SSE).
-
-### 6. Fluxo de Vida Completo: O Processo de Desencriptação (Nova Fase Adicionada)
-- **Desafio:** O dashboard atualmente apenas simula graficamente o envio até o receptor baseando-se no HealthCheck. Para provar o conceito de fato, a requisição deve ser validada por ambos.
-- **Plano de Ação:** Modificar as rotas FastAPI para não possuirem apenas o HealthCheck `/`. Rotas como `POST /encrypt` e `POST /decrypt` serão construídas. O Payload Web fará uma viagem de "ida e volta" pelo `React Flow`. Retornará a Cifra na ida e o texto puro validado na volta. O painel deve pintar o log de cada etapa da matemática de volta!
-- **Desafio:** Subir processos web, APIs isoladas ou a combinação dos dois exige conhecimentos complexos do usuário e múltiplos terminais lado a lado na tela.
-- **Ação Técnica:** Configuramos scripts de automação robustos em `/package.json`, ex: `"dev:sym": "turbo run dev --filter=web --filter=sym-crypto-service"`. Isso invoca a CLI do Turbo: ao detectar esse atalho, o Turbo sobe magicamente em threads duplas de velocidade (evitando compilações redudantes graças ao cache interno `cache: true`) apenas os projetos chamados. 
+### 4. A Abstração Universal: \`crypto-core\`
+- **O Design:** A fim de proteger a inteligência sistêmica e ser publicável (Ex: NPM), toda a lógica criptográfica pesada (Chaves RSA PEM, AES-CBC-256, e o framework de Scrypt Salted) residem pura e isoladamente na sub-biblioteca interna \`packages/crypto-core\`.
+- **Uso Comum:** As VMs do projeto (Cifra, Simétrica, Assimétrica, Hashing) apenas *importam* do pacote mestre as funções pré-compiladas, aplicando-as em rotas HTTPS RestFul. Isso limpa drasticamente o código de backend.
 
 ---
+
+## ⚙️ Fluxo Operacional: Como o Sistema Respira?
+
+O ápice desta reestruturação se provou na **Orquestração Automática de Containers Virtuais (VMs)** gerenciada diretamente por uma interface web intuitiva.
+
+### A. O Ciclo de Vida dos Comandos (Turborepo)
+Em monorepos normais lidar com diferentes portas e aplicações em paralelo consumia múltiplos Bash Terminais para o Cientista de Dados/Dev. 
+Resolvemos orquestrando **Comandos Turbo Paralelos** em `package.json`. 
+Exemplo: ao rodar \`npm run dev:cipher\`, a CLI do Turborepo inteligentemente rastreia o filtro \`--filter=web\` e \`--filter=cipher-service\`. Utilizando threads baseadas no poder do seu CPU, ambas aplicações sobem paralelamente com output unificado colorido (o Front em 3000, e a VM Cifra em 3001) em menos de 1 segundo utilizando Cache Hits.
+
+### B. Auto-Wake Híbrido (O Despertar da VM)
+*"O que acontece se eu rodar **apenas** o front-end e não ativar os backends e pedir pra visualmente encriptar algo?"*
+Foi adicionada inteligência nativa Next.js Node (Sub-Process) no App web.
+1. O Front bate de frente com o endpoint interno de orquestração web (Rota Serverless Next REST `POST /api/vm`).
+2. O servidor usa a lib `wait-on` para farejar a porta HTTP da máquina destinada na placa local.
+3. Se a porta cair no *Timeout* (morta), o código **inicia ativamente via Child Process Shell o script NPM associado à VM apagada**, segurando a requisição no ar por 15 segundos até o boot finalizar. O ambiente virtualizado da criptografia surge sob demanda, frio (Cold Start).
+
+### C. O Fluxo de Telemetria Contínua (Os Logs Nativos)
+Em vez de ver terminais Bash escondidos, a interface provê o fluxo técnico transparente via "Short-Polling".
+* Foi criada a lib mestre auxiliar \`packages/logger\`.
+* Sempre que o motor criptográfico Fastify dentro da VM gera uma "Math Action" (Geração de Assinatura, KeyPair, Tempo de Scrypt), além do \`console.log\` normal padrão, também empilha ordenado em memória usando a library \`logger\`.
+* Imediatamente os frontends da página fazem \`HTTP GET /logs\` num intervalo ultra-curto (1000ms).
+* As linhas são repassadas via Json, e printadas como terminais Hacker-like em Tempo Real no SideBar panel esquerdo da UI Web!
+
+### D. A Trip de Desencriptação (Ida e Volta Completa)
+Para provar que nada é 'Mokado' e a Criptografia é de Classe Bélica:
+1. O texto do Painel vai como Payload JSON: \`{"message": "secret"}\`.
+2. A VM reage em \`POST /encrypt\`. Puxado pelo pacote `crypto-core`, ela amarra a matemática, encerra e emite Log (detectado simultaneamente pelo SideBar visual). E responde a cifra intransitiva ex: `f32c1e40a...`.
+3. O Painel web renderiza "O Túnel Azul" da React Flow Animation.
+4. Pausa por um segundo como dramaturgia visual / networking real, e despacha de volta para \`POST /decrypt\` com a mesma cifra ofuscada.
+5. Se for modo **Simétrico**: A mesma VM desencripta a mesma cifra com a chave que só *ela* gerou internamente, recuperando em ASCII o conteúdo 100%. Se for o serviço de **Hash**, ele roda o `timingSafeEqual()` em vez de tentar desencriptar (impossível no salt unidirecional).
+6. A interface reage com "O Túnel Verde" emitindo a resposta Final original no Log, comprovando a viagem End-to-End criptograficamente perfeita.

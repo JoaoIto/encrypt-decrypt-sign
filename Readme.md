@@ -8,29 +8,33 @@ O projeto adota uma arquitetura em **Monorepo** (gerenciada por `TurboRepo` + `n
 
 ---
 
-## 📖 Sumário de Componentes & Deep Documentation
+## 📖 1. Sumário do Monorepo & Base de Conhecimento
 
-Criamos pesquisas e explicações técnicas detalhadas (Deep Research) para **cada** engrenagem deste projeto. Acesse as documentações isoladas abaixo para aprender a anatomia de cada serviço (Rotas, Lógicas, Arquiteturas Internas e Código):
+Criamos explicações técnicas e guias detalhados (Deep Research) para **cada** peça deste ecossistema. Utilize o sumário numérico abaixo para navegar na arquitetura completa:
 
-### 🛠️ Bibliotecas (Packages) Base
-A inteligência isolada de Frameworks web:
-- [📦 \`crypto-core\` (A Lógica Criptográfica Base)](./docs/packages/crypto-core/README.md)
-- [📝 \`logger\` (Serviço global de Telemetria de Memória)](./docs/packages/logger/README.md)
+### 1.1 🏛️ O Coração da Arquitetura
+Entenda o fluxo completo de como as VMs operam, a orquestração do frontend, e como o monorepo foi construído. Este é o ponto de partida recomendado:
+- [📄 `architecture.md` (Visão Geral de Arquitetura e Vida das VMs)](./docs/architecture.md)
 
-### 🖥️ Aplicações (Apps) Micro-serviços
-As instâncias que consomem o *crypto-core* rodando em portais isolados Fastify:
-- [🔒 \`sym-crypto-service\` (AES-256 Symmetric VM)](./docs/apps/sym-crypto-service/README.md)
-- [🔑 \`asym-crypto-service\` (RSA Public/Private VM)](./docs/apps/asym-crypto-service/README.md)
-- [🛡️ \`hash-service\` (Scrypt Hashing VM)](./docs/apps/hash-service/README.md)
-- [🏛️ \`cipher-service\` (Caesar Cipher Didactic VM)](./docs/apps/cipher-service/README.md)
+### 1.2 🛠️ Bibliotecas Base (Packages)
+As lógicas brutas isoladas compartilhadas pelos microserviços:
+- [📦 \`crypto-core\` (Deep Research: Lógica Matemática)](./docs/packages/crypto-core/README.md)
+- [📝 \`logger\` (Deep Research: Telemetria em Memória)](./docs/packages/logger/README.md)
 
-### 🌐 Infraestrutura (User Interface)
-O Mestre dos Bonecos do sistema operacional virtual:
-- [✨ \`web\` (React Flow Dashboard & Orchestrator Master)](./docs/apps/web/README.md)
+### 1.3 🖥️ Micro-serviços de Criptografia (Apps)
+As "Virtual Machines" (APIs Fastify) que envelopam a matemática:
+- [🔒 \`sym-crypto-service\` (Mergulho no AES-256-CBC)](./docs/apps/sym-crypto-service/README.md)
+- [🔑 \`asym-crypto-service\` (Mergulho no RSA 2048 Público/Privado)](./docs/apps/asym-crypto-service/README.md)
+- [🛡️ \`hash-service\` (Mergulho no Scrypt + Salt Dinâmico)](./docs/apps/hash-service/README.md)
+- [🏛️ \`cipher-service\` (Mergulho na Cifra Elementar de César)](./docs/apps/cipher-service/README.md)
+
+### 1.4 🌐 O Painel Orquestrador (Front-end)
+O cérebro gráfico que manipula todo o sistema:
+- [✨ \`web\` (Deep Research: Next.js + React Flow)](./docs/apps/web/README.md)
 
 ---
 
-## ⚡ Guia Plug & Play
+## ⚡ 2. Guia Plug & Play
 
 Esta aplicação foi polida para funcionar perfeitamente sem necessidade de o desenvolvedor decorar o ambiente inteiro. 
 

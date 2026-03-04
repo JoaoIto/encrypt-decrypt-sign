@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "encrypt-decrypt",
+  "name": "encrypt-decrypt-sign",
   "version": "1.0.0",
   "description": "",
   "main": "cifra.js",

@@ -73,7 +73,7 @@ export default function App() {
           setEdges(eds => eds.map(e => e.id === routeOutId ? { ...e, animated: false, style: {} } : e));
         }, 1000);
       } else {
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Erro: VM offline. Suba o ambiente com pnpm run dev`]);
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Erro: VM offline. Suba o ambiente com npm run dev`]);
         setEdges(eds => eds.map(e => e.id === routeInId ? { ...e, animated: false, style: { stroke: '#ef4444' } } : e));
       }
 

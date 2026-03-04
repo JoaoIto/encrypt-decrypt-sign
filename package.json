@@ -1,14 +1,24 @@
 {
-  "type": "module",
-  "name": "encrypt-decrypt-sign",
-  "version": "1.0.0",
-  "description": "",
-  "main": "cifra.js",
+  "name": "crypto-visualizer-workspace",
+  "version": "2.0.0",
+  "private": true,
+  "packageManager": "npm@10.8.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "node ./index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "turbo run dev",
+    "dev:cipher": "turbo run dev --filter=web --filter=cipher-service",
+    "dev:hash": "turbo run dev --filter=web --filter=hash-service",
+    "dev:sym": "turbo run dev --filter=web --filter=sym-crypto-service",
+    "dev:asym": "turbo run dev --filter=web --filter=asym-crypto-service",
+    "dev:jwt": "turbo run dev --filter=web --filter=jwt-service",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
   },
-  "keywords": [],
-  "author": "JoaoIto",
-  "license": "ISC"
+  "devDependencies": {
+    "turbo": "latest"
+  }
 }

@@ -1,0 +1,21 @@
+{
+    "name": "cipher-service",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch src/index.js",
+        "start": "node src/index.js",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@fastify/cors": "^9.0.1",
+        "crypto-core": "*",
+        "fastify": "^4.26.2",
+        "logger": "*"
+    },
+    "devDependencies": {
+        "supertest": "^7.2.2",
+        "vitest": "^4.0.18"
+    }
+}

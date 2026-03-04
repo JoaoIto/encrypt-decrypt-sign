@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { log, logsHistory } from 'logger';
-import { hashPassword, verifyPassword } from 'crypto-core';
+import { hashPassword, verifyPassword } from 'encrypt-decrypt-sign';
 
 export const app = Fastify({ logger: false }); // Desligado pra teste
 await app.register(cors);

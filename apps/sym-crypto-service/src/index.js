@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { log, logsHistory } from 'logger';
-import { generateSymmetricKeyAndIV, encryptSymmetric, decryptSymmetric } from 'crypto-core';
+import { generateSymmetricKeyAndIV, encryptSymmetric, decryptSymmetric } from 'encrypt-decrypt-sign';
 
 export const app = Fastify({ logger: false }); // Desligado p/ teste limpo
 await app.register(cors);

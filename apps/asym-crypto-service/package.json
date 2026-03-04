@@ -10,7 +10,7 @@
     },
     "dependencies": {
         "@fastify/cors": "^9.0.1",
-        "crypto-core": "*",
+        "encrypt-decrypt-sign": "*",
         "fastify": "^4.26.2",
         "logger": "*"
     },

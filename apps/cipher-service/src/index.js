@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { log, logsHistory } from 'logger';
-import { encryptCaesar, decryptCaesar } from 'crypto-core';
+import { encryptCaesar, decryptCaesar } from 'encrypt-decrypt-sign';
 
 const fastify = Fastify({ logger: true });
 await fastify.register(cors);

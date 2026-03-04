@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { log, logsHistory } from 'logger';
-import { generateAsymmetricKeyPair, encryptAsymmetric, decryptAsymmetric } from 'crypto-core';
+import { generateAsymmetricKeyPair, encryptAsymmetric, decryptAsymmetric } from 'encrypt-decrypt-sign';
 
 export const app = Fastify({ logger: false });
 await app.register(cors);

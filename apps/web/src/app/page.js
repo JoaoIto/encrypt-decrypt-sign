@@ -34,8 +34,26 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState([]);
+  const [activePort, setActivePort] = useState(null);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+
+  // Hook de Telemetria (Sonda os Logs da VM Ativa constantemente)
+  React.useEffect(() => {
+    if (!activePort) return;
+    const interval = setInterval(async () => {
+      const logRes = await fetch(`http://localhost:${activePort}/logs`).catch(() => null);
+      if (logRes && logRes.ok) {
+        const data = await logRes.json();
+        // Só insere se vieram logs novos para não bugar o React re-render
+        setLogs(prev => {
+          const combined = new Set([...prev, ...data.logs]);
+          return Array.from(combined);
+        });
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activePort]);
 
   const simulateExchange = async (type) => {
     const timeStart = performance.now();
@@ -45,6 +63,10 @@ export default function App() {
     const routeInId = type === 'sym' ? 'e-c-s' : type === 'asym' ? 'e-c-a' : 'e-c-h';
     const routeOutId = type === 'sym' ? 'e-s-r' : type === 'asym' ? 'e-a-r' : 'e-h-r';
     const port = type === 'sym' ? 3003 : type === 'asym' ? 3004 : 3002;
+    const targetUrl = `http://localhost:${port}`;
+
+    // Liga a Telemetria para esta Porta
+    setActivePort(port);
 
     setEdges(eds => eds.map(e => e.id === routeInId ? { ...e, animated: true, style: { stroke: '#3b82f6', strokeWidth: 4 } } : e));
 
@@ -72,28 +94,53 @@ export default function App() {
       setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Conectando: http://localhost:${port}`]);
 
       // 2. Simular chamada real (agora que sabemos que a VM tá de pé)
-      const res = await fetch(`http://localhost:${port}/`).catch(() => null);
-      const timeEnd = performance.now();
-      const latency = (timeEnd - timeStart).toFixed(2);
+      const resEncrypt = await fetch(`${targetUrl}/encrypt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message || 'Hello Crypto World' })
+      }).catch(() => null);
 
-      if (res && res.ok) {
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Sucesso! Tempo Total de Operação: ${latency}ms`]);
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Payload Original: "${message || 'vazio'}"`]);
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Encriptando dados na VM...`]);
+      if (resEncrypt && resEncrypt.ok) {
+        const encryptData = await resEncrypt.json();
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔒 Encriptado! Cypher Raw: ${encryptData.encrypted.substring(0, 30)}...`]);
 
-        // Animar borda de saída
+        // Criptografia pronta, vamos mover o painel (A Borda Animada volta)
         setEdges(eds => eds.map(e => {
           if (e.id === routeInId) return { ...e, animated: false, style: {} };
           if (e.id === routeOutId) return { ...e, animated: true, style: { stroke: '#10b981', strokeWidth: 4 } };
           return e;
         }));
 
-        setTimeout(() => {
-          setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Receptor recebeu e processou o Token final.`]);
+        // 3. Fazer o Caminho de Volta: Desencriptar a Cifra
+        setTimeout(async () => {
+          setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 📤 Enviando Cypher de volta para Receptor tentar abrir...`]);
+
+          const decryptPayload = type === 'hash'
+            ? { encrypted: encryptData.encrypted, originalQuery: message || 'Hello Crypto World' }
+            : { encrypted: encryptData.encrypted };
+
+          const resDecrypt = await fetch(`${targetUrl}/decrypt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(decryptPayload)
+          }).catch(() => null);
+
+          if (resDecrypt && resDecrypt.ok) {
+            const decryptData = await resDecrypt.json();
+            const timeEnd = performance.now();
+            const latency = (timeEnd - timeStart).toFixed(2);
+
+            setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔓 Desencriptado com Sucesso! Payload real recuperado: "${decryptData.decrypted}"`]);
+            setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Round Trip Total: ${latency}ms`]);
+          } else {
+            setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Receptor falhou em desencriptar os dados.`]);
+          }
+
           setEdges(eds => eds.map(e => e.id === routeOutId ? { ...e, animated: false, style: {} } : e));
-        }, 1000);
+        }, 1200);
+
       } else {
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Erro: VM offline. Suba o ambiente com npm run dev`]);
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Erro: Endpoint /encrypt da VM não respondeu.`]);
         setEdges(eds => eds.map(e => e.id === routeInId ? { ...e, animated: false, style: { stroke: '#ef4444' } } : e));
       }
 

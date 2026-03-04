@@ -49,15 +49,35 @@ export default function App() {
     setEdges(eds => eds.map(e => e.id === routeInId ? { ...e, animated: true, style: { stroke: '#3b82f6', strokeWidth: 4 } } : e));
 
     try {
+      // 1. Tentar acordar a VM (Auto-Start) se estiver offline
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Checando estado da VM na porta ${port}...`]);
+
+      const bootRes = await fetch('/api/vm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vmType: type === 'sym' ? 'sym-crypto' : type === 'asym' ? 'asym-crypto' : 'hash', port })
+      });
+
+      if (!bootRes.ok) {
+        throw new Error("Falha catastrófica ao iniciar máquina");
+      }
+
+      const bootData = await bootRes.json();
+      if (bootData.status === 'started') {
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🚀 VM Acordada com sucesso! Inicialização a frio completada.`]);
+      } else if (bootData.status === 'already_running') {
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⚡ VM já estava quente (Rodando).`]);
+      }
+
       setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Conectando: http://localhost:${port}`]);
 
-      // Simular chamada real (por agora bate no healthcheck da VM Fastify)
+      // 2. Simular chamada real (agora que sabemos que a VM tá de pé)
       const res = await fetch(`http://localhost:${port}/`).catch(() => null);
       const timeEnd = performance.now();
       const latency = (timeEnd - timeStart).toFixed(2);
 
       if (res && res.ok) {
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Sucesso! Tempo de resposta: ${latency}ms`]);
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Sucesso! Tempo Total de Operação: ${latency}ms`]);
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Payload Original: "${message || 'vazio'}"`]);
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Encriptando dados na VM...`]);
 

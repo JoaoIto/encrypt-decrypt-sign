@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "demo": "node demo.js",
     "dev:cipher": "turbo run dev --filter=web --filter=cipher-service",
     "dev:hash": "turbo run dev --filter=web --filter=hash-service",
     "dev:sym": "turbo run dev --filter=web --filter=sym-crypto-service",

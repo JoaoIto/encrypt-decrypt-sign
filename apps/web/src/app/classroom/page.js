@@ -107,19 +107,21 @@ export default function ClassroomVisualDemo() {
     };
 
     const LogViewer = ({ logs, refObj }) => (
-        <div className="flex-1 bg-black/60 border border-slate-700 rounded-lg p-4 overflow-y-auto font-mono text-[13px] leading-relaxed relative flex flex-col gap-1 shadow-inner h-[400px]">
-            <div className="text-slate-500 mb-2 border-b border-slate-800 pb-2">-- Console Output --</div>
+        <div style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', border: '1px solid #334155', borderRadius: '0.5rem', padding: '1rem', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.8125rem', lineHeight: 1.6, position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.25rem', boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.5)', height: '400px' }}>
+            <div style={{ color: '#64748b', marginBottom: '0.5rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem' }}>-- Console Output --</div>
             {logs.map((L, i) => {
-                let color = 'text-slate-300';
-                if (L.type === 'system') color = 'text-blue-400 font-bold';
-                if (L.type === 'data') color = 'text-yellow-300';
-                if (L.type === 'success') color = 'text-emerald-400 font-bold';
-                if (L.type === 'error') color = 'text-red-400';
+                let color = '#cbd5e1'; // default slate-300
+                let fontWeight = 'normal';
+
+                if (L.type === 'system') { color = '#60a5fa'; fontWeight = 'bold'; } // blue-400
+                if (L.type === 'data') { color = '#fde047'; } // yellow-300
+                if (L.type === 'success') { color = '#34d399'; fontWeight = 'bold'; } // emerald-400
+                if (L.type === 'error') { color = '#f87171'; } // red-400
 
                 return (
-                    <div key={i} className="flex gap-3">
-                        <span className="text-slate-600">[{L.time}]</span>
-                        <span className={color}>{L.msg}</span>
+                    <div key={i} style={{ display: 'flex', gap: '0.75rem' }}>
+                        <span style={{ color: '#475569' }}>[{L.time}]</span>
+                        <span style={{ color, fontWeight }}>{L.msg}</span>
                     </div>
                 );
             })}
@@ -128,91 +130,101 @@ export default function ClassroomVisualDemo() {
     );
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col p-6 font-sans">
+        <div style={{ minHeight: '100vh', backgroundColor: '#020617', color: '#e2e8f0', display: 'flex', flexDirection: 'column', padding: '1.5rem', fontFamily: 'system-ui, sans-serif' }}>
 
             {/* Header */}
-            <header className="mb-8 flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-slate-800 glass-panel">
+            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #1e293b', backdropFilter: 'blur(12px)' }}>
                 <div>
-                    <h1 className="text-3xl font-bold text-gradient mb-2">🎓 Criptoanálise na Prática</h1>
-                    <p className="text-slate-400 text-sm">Visualização em <strong className="text-white">Slow-Motion</strong> do motor matemático da Cifra de Substituição.</p>
+                    <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', margin: '0 0 0.5rem 0', background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>🎓 Criptoanálise na Prática</h1>
+                    <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>Visualização em <strong style={{ color: 'white' }}>Slow-Motion</strong> do motor matemático da Cifra de Substituição.</p>
                 </div>
-                <Link href="/" className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-sm font-semibold rounded-xl transition-all shadow border border-slate-700">
+                <Link href="/" style={{ padding: '0.625rem 1.25rem', backgroundColor: '#1e293b', color: 'white', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderRadius: '0.75rem', transition: 'all 0.2s', border: '1px solid #334155' }}>
                     ← Voltar ao Dashboard Principal
                 </Link>
             </header>
 
             {/* Main UI Area */}
-            <div className="flex flex-1 gap-6 items-stretch relative">
+            <div style={{ display: 'flex', flex: 1, gap: '1.5rem', alignItems: 'stretch', position: 'relative' }}>
 
                 {/* LADO A: Remetente */}
-                <div className="flex-1 flex flex-col gap-4 bg-slate-900/40 p-5 rounded-2xl border border-slate-800 relative z-10 glass-panel">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-xl font-bold text-emerald-400">VM: Remetente (Ponto A)</h2>
-                        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-mono border border-emerald-500/20">IP: 192.168.1.104</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', backgroundColor: 'rgba(15, 23, 42, 0.4)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #1e293b', position: 'relative', zIndex: 10, backdropFilter: 'blur(12px)', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#34d399', margin: 0 }}>VM: Remetente (Ponto A)</h2>
+                        <span style={{ padding: '0.25rem 0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', borderRadius: '9999px', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid rgba(16, 185, 129, 0.2)' }}>IP: 192.168.1.104</span>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <input
                             type="text"
                             value={plainText}
                             onChange={e => setPlainText(e.target.value)}
                             placeholder="Digite a mensagem em texto claro..."
                             disabled={isSending}
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                            style={{ flex: 1, backgroundColor: '#020617', border: '1px solid #334155', borderRadius: '0.75rem', padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'white', outline: 'none', opacity: isSending ? 0.5 : 1 }}
                         />
                         <button
                             onClick={runSimulation}
                             disabled={isSending || !plainText}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-50"
+                            style={{ backgroundColor: '#059669', color: 'white', fontWeight: 'bold', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', border: 'none', cursor: (isSending || !plainText) ? 'not-allowed' : 'pointer', opacity: (isSending || !plainText) ? 0.5 : 1, transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
                         >
-                            Criptografar & Enviar 🚀
+                            Criptografar e Enviar 🚀
                         </button>
                     </div>
 
                     <LogViewer logs={senderLogs} refObj={endRefSender} />
 
                     {cipherResult && (
-                        <div className="mt-2 p-4 bg-red-950/30 border border-red-900/50 rounded-xl">
-                            <span className="text-xs text-red-300/70 uppercase tracking-widest font-bold block mb-1">Payload Cifrado Final:</span>
-                            <span className="font-mono text-red-400 text-lg tracking-widest">{cipherResult}</span>
+                        <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: 'rgba(69, 10, 10, 0.3)', border: '1px solid rgba(127, 29, 29, 0.5)', borderRadius: '0.75rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'rgba(252, 165, 165, 0.7)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Payload Cifrado Final:</span>
+                            <span style={{ fontFamily: 'monospace', color: '#f87171', fontSize: '1.125rem', letterSpacing: '0.1em' }}>{cipherResult}</span>
                         </div>
                     )}
                 </div>
 
                 {/* CABLE / CONNECTION EMULATION */}
-                <div className="w-16 flex items-center justify-center relative">
-                    <div className="absolute w-full h-[2px] bg-slate-700 top-1/2 -translate-y-1/2"></div>
+                <div style={{ width: '4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <div style={{ position: 'absolute', width: '100%', height: '2px', backgroundColor: '#334155', top: '50%', transform: 'translateY(-50%)' }}></div>
                     {/* Packet Animation */}
                     <div
-                        className="absolute h-8 w-8 bg-blue-500 rounded-full shadow-[0_0_20px_blue] z-20 transition-all duration-75 flex items-center justify-center"
                         style={{
+                            position: 'absolute',
+                            height: '2rem',
+                            width: '2rem',
+                            backgroundColor: '#3b82f6',
+                            borderRadius: '9999px',
+                            boxShadow: '0 0 20px #3b82f6, 0 0 40px rgba(59, 130, 246, 0.5)',
+                            zIndex: 20,
+                            transition: 'left 50ms linear',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             left: `${packetPosition}%`,
                             transform: 'translate(-50%, -50%)',
                             top: '50%',
                             opacity: packetVisible ? 1 : 0
                         }}
                     >
-                        <span className="text-[10px]">📦</span>
+                        <span style={{ fontSize: '0.625rem' }}>📦</span>
                     </div>
                 </div>
 
                 {/* LADO B: Destinatário */}
-                <div className="flex-1 flex flex-col gap-4 bg-slate-900/40 p-5 rounded-2xl border border-slate-800 relative z-10 glass-panel">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-xl font-bold text-blue-400">VM: Receptor (Ponto B)</h2>
-                        <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-mono border border-blue-500/20">IP: 192.168.1.105</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', backgroundColor: 'rgba(15, 23, 42, 0.4)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #1e293b', position: 'relative', zIndex: 10, backdropFilter: 'blur(12px)', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#60a5fa', margin: 0 }}>VM: Receptor (Ponto B)</h2>
+                        <span style={{ padding: '0.25rem 0.75rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', borderRadius: '9999px', fontSize: '0.75rem', fontFamily: 'monospace', border: '1px solid rgba(59, 130, 246, 0.2)' }}>IP: 192.168.1.105</span>
                     </div>
 
-                    <div className="h-[50px] flex items-center text-sm text-slate-400 px-4 bg-slate-950/50 rounded-xl border border-slate-800 border-dashed">
+                    <div style={{ height: '3.125rem', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#94a3b8', padding: '0 1rem', backgroundColor: 'rgba(2, 6, 23, 0.5)', borderRadius: '0.75rem', border: '1px dashed #1e293b' }}>
                         Aguardando pacote na porta 3000...
                     </div>
 
                     <LogViewer logs={receiverLogs} refObj={endRefReceiver} />
 
                     {plainResult && (
-                        <div className="mt-2 p-4 bg-blue-950/30 border border-blue-900/50 rounded-xl">
-                            <span className="text-xs text-blue-300/70 uppercase tracking-widest font-bold block mb-1">Conteúdo Decodificado com Sucesso:</span>
-                            <span className="font-mono text-blue-400 text-lg">{plainResult}</span>
+                        <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: 'rgba(23, 37, 84, 0.3)', border: '1px solid rgba(30, 58, 138, 0.5)', borderRadius: '0.75rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'rgba(147, 197, 253, 0.7)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Conteúdo Decodificado com Sucesso:</span>
+                            <span style={{ fontFamily: 'monospace', color: '#60a5fa', fontSize: '1.125rem' }}>{plainResult}</span>
                         </div>
                     )}
                 </div>

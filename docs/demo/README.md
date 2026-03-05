@@ -8,44 +8,91 @@ Este documento detalha o script de terminal interativo construído para fins de 
 
 ---
 
-## 1. O Algoritmo de Substituição 🧮
+## 1. A Matemática da Cifra de Substituição 🧮
 
-A cifra de substituição é uma das formas mais fundamentais e primitivas de criptografia. Ao invés de usar blocos complexos ou chaves derivacionais elípticas (como RSA), ela opera estritamente trocando o valor numérico (ASCII Code) original de cada caractere por um valor fixo consecutivo `N` posições à frente no dicionário de bytes.
+A cifra de substituição é uma das mecânicas mais clássicas e antigas da criptografia (conhecida desde o Império Romano como Cifra de César). A premissa central dessa modalidade é o seguinte fato: **computadores não entendem letras, apenas números**. 
 
-### 1.1 Matemática da Empacotadora (Cifrar)
-O pacote `encrypt-decrypt-sign` invocado pelo `demo.js` possui um motor puro de *Caesar Cipher*. Na aula presencial usamos **SHIFT = 4**.
+Para o sistema computadorizado compreender e exibir a letra `'A'`, ele recorre à Tabela ASCII (ou Unicode), um dicionário global em que a letra `'A'` é estritamente fixada e mapeada como o número Inteiro `65`. 
+
+A matemática de cifragem é puramente baseada em aplicar uma manipulação algébrica (uma soma simples) sobre este número inteiro.
+
+### 1.1 O Cálculo e a Lógica (Modo de Envio)
+
+Para cifrar um caractere $x$, utilizamos uma chave paramétrica numérica em hardcode, chamada de **Shift** (deslocamento). A fórmula atômica da cifra é:
+
+$$ C(x) = x + \text{Shift} $$
+
+> **Exemplo Prático da Aula (Shift = 4):**
+> 1. Se o aluno digitar a letra `'A'`, o sistema extrai instantaneamente seu código numérico base: `65`.
+> 2. O processador aplica a fórmula com deslocamento fixo de 4: `65 + 4 = 69`.
+> 3. Em seguida, o sistema procura na tabela binária: Quem é o caractere de ID `69`? A resposta é a letra `'E'`.
+> 4. Portanto, a letra original `'A'` virou o lixo cibernético mascarado de `'E'`.
+
+### 1.2 Como isso é feito no Código JavaScript?
+
+No nosso motor de criptografia real (`packages/crypto-core/src/index.js`), que é acoplado dentro do CLI de Demonstração, a fórmula purista é replicada utilizando dois métodos originais da Virtual Machine de Javascript (engine V8):
+- `charCodeAt()`: Lê o texto em tela e converte pro respectivo número da tabela universal (Ex: `'A' -> 65`).  
+- `fromCharCode()`: Pega a poeira criptográfica resolvida numericamente e injeta como String pro Ser Humano poder ler.
+
+Confira o recorte real do código de **Cifragem** hospedado no projeto:
 
 ```javascript
-// Exemplo didático do "Motor de Cifragem" da nossa Library
+/* 
+ * Recorte: function encryptCaesar(text, shift)
+ * Localização no Monorepo: /packages/crypto-core/src/index.js
+ */
 export function encryptCaesar(text, shift = 4) {
     let result = "";
+    
+    // 1. LER: O Algoritmo percorre a palavra digitada pelo aluno letra por letra
     for (let i = 0; i < text.length; i++) {
+        
+        // 2. EXTRAÍR: Puxa o valor computacional puro (O Byte Inteiro. Ex: 'A' vira 65)
         let charCode = text.charCodeAt(i);
         
-        // Aplica o Shift empurrando a letra no catálogo universal
+        // 3. CALCULAR e SUBSTITUIR: Executa a fórmula (65 + 4 = 69) 
+        // Em seguida, o String.fromCharCode já converte o 69 para 'E' e anexa no output
         result += String.fromCharCode(charCode + shift);
     }
+    
+    // Devolve as letras mascaradas ao usuário
     return result;
 }
 ```
-**Análise de Complexidade (Big-O):**
-A operação possui complexidade **O(n)** de Tempo (Linear) - sendo *n* o número de caracteres da string (o loop lê a string exatamente 1 vez ponta-a-ponta). Sua complexidade de Espaço / RAM também é **O(n)**, dado que concatenamos uma nova string de mesmo tamanho para a memória de resultado.
 
-### 1.2 Matemática da Reversão (Decifrar)
-O destinatário só é capaz de recuperar da mesma forma, realizando a subtração na tabela (engenharia reversa do Shift).
+### 1.3 Matemática da Reversão (Ato de Decodificar)
+
+A magia de uma cifra simétrica simples é que o **destinatário e o remetente precisam compartilhar o mesmo Segredo** em uma chave comum (`Shift = 4`). Para resgatar a mensagem do estado de lixo ilegível, basta o sistema alvo espelhar a inversão da operação algébrica original:
+
+$$ Texto Claro(x) = x - \text{Shift} $$
+
+> Se o Destinatário B recebeu `'E'` (Lixo de código número `69`), o seu Computador B executará a regra reversa: `69 - 4 = 65`.  Feito a dedução lógica, o `65` é convertido de volta para o texto legível: `'A'`.
+
+Confira o recorte de **Reversão** executado no lado de *Recebimento*:
 
 ```javascript
+/* 
+ * Recorte: function decryptCaesar(text, shift)
+ * Localização no Monorepo: /packages/crypto-core/src/index.js
+ */
 export function decryptCaesar(text, shift = 4) {
     let result = "";
+    
     for (let i = 0; i < text.length; i++) {
-        let charCode = text.charCodeAt(i);
+        // Recebe da rede a letra 'E'. Extrai seu código '69'
+        let charCode = text.charCodeAt(i); 
         
-        // Aplica a retração da letra no catálogo universal
+        // Retrai deslocamento (-4) forçando byte decair e voltar a ser '65' (letra 'A')
         result += String.fromCharCode(charCode - shift);
     }
     return result;
 }
 ```
+
+**Análise de Complexidade (Big-O)**
+Essa operação possui complexidade Big-O de:
+- **Tempo O(n) (Linear):** O micro-processador gastará um tempo proporcionalmente exato em relação ao tamanho `$n$` de letras do texto, porque precisamos engatar e fazer varredura em um Loop exato `For` ao longo e toda dimensão textual.
+- **Espaço (RAM) O(n):** Aloca memória virtual em progressão Linear no Servidor, o espaço é o dobro do tamanho original porque o compilador vai montando na Memória uma String nova, paralela (`""+ Result`) da mesma equivalência de bits do texto inicial, sem destruir um por cima do outro.
 
 ---
 

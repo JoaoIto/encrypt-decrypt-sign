@@ -16,6 +16,11 @@ Abaixo estão os comandos essenciais para você rodar rapidamente qualquer parte
 ```
 npm install
 ```
+**Demonstração Didática DEMO:**
+Rodar a interface interativa de Terminal "Slow-Motion" para Cifra de César com IP Tracking e Logs para teste de criptoanálise.
+```
+npm run demo
+```
 
 **Testes de Segurança:**
 ```
@@ -47,6 +52,7 @@ Acesse os links abaixo para aprender a arquitetura técnica, as rotas e o códig
 6. [Micro-Serviço **`hash-service`** (Scrypt + Salt Dinâmico)](./docs/apps/hash-service/README.md)
 7. [Micro-Serviço **`cipher-service`** (Cifra Didática de César)](./docs/apps/cipher-service/README.md)
 8. [Painel **`web`** (Interface Next.js e Gráficos React Flow)](./docs/apps/web/README.md)
+9. [Criptoanálise Didática **`demo`** (Explicação Matemática e Atividade de Aula)](./docs/demo/README.md)
 
 ---
 
@@ -61,3 +67,24 @@ Toda vez que você aperta o botão *"Testar VM"* no Painel:
 6. Pausa-se 1 segundo e a aplicação devolve de volta a cifra para `/decrypt`.
 7. A máquina destranca e retorna o conteúdo validado para o Receptor.
 8. Enquanto a UI brilha, em *background*, requests de telemetria caem a cada 1000ms puxando a Rota `/logs` da Fastify e preenchendo o terminal visual nativamente na UI Hacker.
+
+---
+
+## 💻 4. Atividade de Criptoanálise: DEMO
+
+Uma ferramenta interativa construída puramente em `Node.JS` chamada **Criptoanálise na Prática** foi englobada neste Monorepo para uso didádico.
+
+Trata-se do comando global `npm run demo`.
+
+**Para que serve este script?**
+Ao contrário das VMs que rodam rápido demais na porta 3000, esta ferramenta funciona com:
+- **Matrix / Slow Motion:** Ela quebra os "Char Codes" letra por letra no terminal usando *setTimeout* e exibindo os processos em tempo real do Cálculo de César (Shift Code Original + ASCII Numérico = Novo Caractere numérico -> Letra Cifrada).
+- **Rastreamento P2P Virtual:** O console captura diretamente pela interface de máquina subjacente (`os.networkInterfaces()`) qual o verdadeiro `IP da Rede Local` do Aluno (Remetente) e simula a ponte do Destinatário sem precisar construir instâncias HTTP na hora da apresentação.
+
+**Como Rodar:**
+1. terminal 1 dá o `npm run demo`
+2. Pressiona `1` para Cifrar e digita no Console. O PC fará a conta em *Slow Motion*.
+3. O terminal Copia com CTRL+C a mensagem Cifrada em *"Vermelho"*. Envia ao amigo no Laboratório.
+4. O terminal 2 roda `npm run demo`, seleciona opção `2` de Descriptografar e cola o lixo virtual. O terminal deste terminal lerá do Byte Zero ao último englobando a matemática com `Shift negativo`.
+
+**Aprenda o Algoritmo e a Matemática aqui:** [Leia a documentação detalhada das Fórmulas da Demonstração e da Engine CLI neste link.](./docs/demo/README.md)

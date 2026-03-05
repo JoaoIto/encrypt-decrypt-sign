@@ -159,6 +159,10 @@ export default function App() {
           Monorepo Dashboard. Envie requisições reais para as VMs independentes e veja o fluxo de dados em tempo real.
         </p>
 
+        <a href="/classroom" className="text-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg mt-2 transition-all">
+          👨‍🏫 Entrar na Visualização
+        </a>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           <label style={{ fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>Carga útil (Payload):</label>
           <input

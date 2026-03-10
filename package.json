@@ -2,6 +2,7 @@
   "name": "crypto-visualizer-workspace",
   "version": "2.0.1",
   "private": true,
+  "type": "module",
   "packageManager": "npm@10.8.0",
   "workspaces": [
     "apps/*",
@@ -9,6 +10,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
     "demo": "node demo.js",
     "dev:cipher": "turbo run dev --filter=web --filter=cipher-service",
     "dev:hash": "turbo run dev --filter=web --filter=hash-service",

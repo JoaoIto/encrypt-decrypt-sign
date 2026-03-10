@@ -159,6 +159,43 @@ export default function App() {
           Monorepo Dashboard. Envie requisições reais para as VMs independentes e veja o fluxo de dados em tempo real.
         </p>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '1.25rem', background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.2) 0%, rgba(15, 23, 42, 0.5) 100%)', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.3)', marginTop: '0.5rem', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%' }}></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', border: '1px solid rgba(59, 130, 246, 0.4)', boxShadow: 'inset 0 0 10px rgba(59,130,246,0.2)' }}>
+              🎓
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ color: '#93c5fd', fontWeight: 'bold', fontSize: '15px', letterSpacing: '0.5px' }}>Laboratório Prático</span>
+              <span style={{ color: '#94a3b8', fontSize: '12px' }}>Criptoanálise Visual</span>
+            </div>
+          </div>
+          <a href="/classroom" style={{
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+            color: 'white',
+            fontWeight: '600',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            textDecoration: 'none',
+            boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '8px',
+            zIndex: 1,
+            transition: 'all 0.2s ease-in-out',
+            cursor: 'pointer'
+          }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.6)'; e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(37, 99, 235, 0.4)'; e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)'; }}
+          >
+            <span style={{ fontSize: '14px' }}>Acessar Interactive Classroom</span>
+            <span style={{ fontSize: '16px' }}>➔</span>
+          </a>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           <label style={{ fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>Carga útil (Payload):</label>
           <input

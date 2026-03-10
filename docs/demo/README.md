@@ -89,6 +89,20 @@ export function decryptCaesar(text, shift = 4) {
 }
 ```
 
+### 1.4 A Matemática da Complexidade (Multi-Layer Cascading) 🧬
+
+Para garantir uma **avaliação acadêmica máxima**, a arquitetura do algoritmo evoluiu da clássica Cifra de César para o modelo de **Substituição em Cascata com Múltiplas Camadas (Multi-Layer Cascading)** iterativas.
+Note que, se um script rodasse `N` vezes a Cifra de César com a mesma fórmula linear sobre um arquivo, o resultado criptográfico real seria reduzido a um único deslocamento maior simplório (Ex: `Shift +4 +4 = Shift +8`), tornando a segurança irrisória.
+
+Para forçar um cenário de **Caos Posicional Analítico**, a engine implementada (`encryptCaesarCascade`) neste projeto realiza duas subversões da linearidade romana tradicional em cada Camada ($L$) processada:
+
+1. **Deslocamento Variável por Posição ($D_{L,i}$):** O deslocamento perde a característica de matriz fixa. O `Shift` é multiplicado pelo nível da camada e sofre Injeção de Distorção pelo resto da divisão Indexical do caractere (`i % 3`).
+   Fórmula do Deslocamento da Camada L e Índice $i$: 
+   $$ D_{(L,i)} = (\text{Base} \times L) + (i \pmod 3) $$
+   $$ C(x_{L,i}) = x_{L-1,i} + D_{(L,i)} $$
+
+2. **Transposição Geométrica Escalar (Reversão):** Para destruir metodologias de Análise de Frequência de Idiomas inter-camadas, no décimo de segundo subsequente do fim do Loop da Camada Atual ($L$), toda a string gerada sofre uma **Transposição Brutal** (ela é invertida integralmente de ponta a ponta: `Reverse`) antes de ser reinjetada como Fator de Entrada para a Camada seguinte ($L+1$). A reversão do texto na descriptografia exige estrita inversão descendente das fases e blocos (Layer 3 $\rightarrow$ Destranspõe $\rightarrow$ Subtrai Fator $D_3$ $\rightarrow$ Layer 2 $\dots$).
+
 **Análise de Complexidade (Big-O)**
 Essa operação possui complexidade Big-O de:
 - **Tempo O(n) (Linear):** O micro-processador gastará um tempo proporcionalmente exato em relação ao tamanho `$n$` de letras do texto, porque precisamos engatar e fazer varredura em um Loop exato `For` ao longo e toda dimensão textual.
@@ -139,9 +153,9 @@ for (let i = 0; i < plainText.length; i++) {
 
 1. Conectem 2 Computadores da Sala. 
 2. No `Computador A`, abram o projeto e digitem `npm run demo`.
-3. Escolham opção `[1]` e informem a mensagem. O computador irá gerar a matemática em câmera lenta.
+3. Escolham opção `[1]`, digitem a mensagem e o **Número de Camadas (Layers)** de segurança. O computador irá gerar a matemática tridimensional multicamadas em câmera lenta!
 4. O Aluno Copia a linha de texto vermelha (`Texto Cifrado`).
 5. O Aluno B manda este texto para o `Computador B `(Via Whatsapp, Discord...).
-6. No `Computador B`, abre-se o `npm run demo` digitando a `[2]`. Colam este lixo cifrado no console e assistem a reversão matemática da cifra ocorrendo pino por pino até decodificar a frase.
+6. No `Computador B`, abre-se o `npm run demo` digitando a `[2]`. Informa o mesmo **Número de Camadas** combinadas e o lixo cifrado no console e assistem a reversão de Transposição e Deslocamento ocorrendo camada por camada até decodificar a frase.
 
 *(Não há risco de dependência HTTP ou CORS para a rede restrita do Laboratório da Instituição, pois não roda sob WebServers como a parte 1 do trabalho, roda primariamente direto nas artérias do Engine Node V8 local).*

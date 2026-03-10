@@ -19,6 +19,55 @@ export function decryptCaesar(encryptedMessage, shifts = 4) {
 }
 
 // ============================================
+// 1.5 CIFRA EM CASCATA (Complexidade Multi-Layer)
+// ============================================
+export function encryptCaesarCascade(message, baseShift = 4, layers = 3) {
+  let result = message;
+
+  for (let layer = 1; layer <= layers; layer++) {
+    // 1. Cifragem com Fator Dinâmico: BaseShift * CamadaAtual
+    const dynamicShift = baseShift * layer;
+    let temp = "";
+
+    for (let i = 0; i < result.length; i++) {
+      // Complexidade Algorítmica: O shift depende do índice para evitar matemática linear (A+A = 2A)
+      const charCode = result.charCodeAt(i);
+      const positionalShift = dynamicShift + (i % 3); // Opcional: injetando distorção posicional
+      temp += String.fromCharCode(charCode + positionalShift);
+    }
+
+    // 2. Transposição (Reverse string) antes de descer pra próxima camada
+    result = temp.split("").reverse().join("");
+  }
+
+  return result;
+}
+
+export function decryptCaesarCascade(encryptedMessage, baseShift = 4, layers = 3) {
+  let result = encryptedMessage;
+
+  // A Reversão DEVE Ocorrer na ordem inversa (Da última camada até a primeira)
+  for (let layer = layers; layer >= 1; layer--) {
+    // 1. Desfazer Transposição (Invertendo a String novamente)
+    result = result.split("").reverse().join("");
+
+    // 2. Desfazer Fator Dinâmico: BaseShift * CamadaAtual
+    const dynamicShift = baseShift * layer;
+    let temp = "";
+
+    for (let i = 0; i < result.length; i++) {
+      const charCode = result.charCodeAt(i);
+      const positionalShift = dynamicShift + (i % 3);
+      temp += String.fromCharCode(charCode - positionalShift);
+    }
+
+    result = temp;
+  }
+
+  return result;
+}
+
+// ============================================
 // 2. SYM-CRYPTO (Symmetric Encryption - AES-256-CBC)
 // ============================================
 

@@ -2,6 +2,7 @@
   "name": "crypto-visualizer-workspace",
   "version": "2.0.1",
   "private": true,
+  "type": "module",
   "packageManager": "npm@10.8.0",
   "workspaces": [
     "apps/*",

@@ -88,3 +88,47 @@ Ao contrário das VMs que rodam rápido demais na porta 3000, esta ferramenta fu
 4. O terminal 2 roda `npm run demo`, seleciona opção `2` de Descriptografar e cola o lixo virtual. O terminal deste terminal lerá do Byte Zero ao último englobando a matemática com `Shift negativo`.
 
 **Aprenda o Algoritmo e a Matemática aqui:** [Leia a documentação detalhada das Fórmulas da Demonstração e da Engine CLI neste link.](./docs/demo/README.md)
+
+---
+
+## 🔒 5. Atividade de Assinatura Digital: HTTPS + TLS 1.3 + Nginx
+
+Esta atividade acadêmica demonstra na prática o ciclo completo de um **Certificado Digital Autoassinado** funcionando em um servidor web real, explorando os mesmos conceitos teóricos de chaves públicas e privadas (RSA) utilizados nos micro-serviços deste monorepo — desta vez aplicados na camada de transporte da Web.
+
+**📋 Requisitos atendidos:**
+- ✅ Servidor web **Nginx 1.28** em contêiner Docker
+- ✅ Protocolo **HTTPS obrigatório** (HTTP redireciona 301 → HTTPS)
+- ✅ **TLS 1.3** exclusivo (versões anteriores desabilitadas)
+- ✅ Chave RSA de **4096 bits** (gerada via OpenSSL)
+- ✅ Certificado **autoassinado** (sem CA pública)
+- ✅ Aplicação **Joomla 5.4.3** rodando sobre o servidor seguro
+
+**🏗️ Arquitetura da Solução:**
+```
+Navegador  ──HTTPS (TLS 1.3 / RSA 4096)──►  Nginx 1.28 (porta 443)
+                                                      │ proxy HTTP interno
+                                                      ▼
+                                             Joomla 5 (Apache)
+                                                      │
+                                                      ▼
+                                             MySQL 8.0 (banco)
+```
+
+**⚡ Como Rodar:**
+```bash
+cd packages/assignature
+
+# Windows (sem OpenSSL no PATH)
+node generate-cert.js
+
+# Linux / Mac / Git Bash
+openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+  -keyout nginx/certs/server.key -out nginx/certs/server.crt \
+  -subj "/C=BR/ST=SP/L=SaoPaulo/O=Faculdade/OU=Seguranca/CN=localhost"
+
+docker compose up -d
+# Acesse: https://localhost
+```
+
+**📖 Documentação Completa com Prints e Tutorial Passo a Passo:**  
+→ [**docs/packages/assignature/README.md**](./docs/packages/assignature/README.md)

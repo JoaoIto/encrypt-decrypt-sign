@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: moodle_user
+      POSTGRES_PASSWORD: moodle_password
+      POSTGRES_DB: moodle
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: always
+
+  moodle:
+    image: bitnami/moodle:latest
+    environment:
+      MOODLE_DATABASE_HOST: db
+      MOODLE_DATABASE_PORT_NUMBER: 5432
+      MOODLE_DATABASE_USER: moodle_user
+      MOODLE_DATABASE_PASSWORD: moodle_password
+      MOODLE_DATABASE_NAME: moodle
+    depends_on:
+      - db
+    restart: always
+
+  nginx:
+    # Usando a versão mais moderna do Nginx
+    image: nginx:latest
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro # Pasta com os certificados gerados
+    depends_on:
+      - moodle
+    restart: always
+
+volumes:
+  db_data:

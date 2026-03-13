@@ -1,0 +1,53 @@
+services:
+
+  # ─────────────────────────────
+  # Banco de Dados (MySQL)
+  # ─────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: joomla_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: joomla
+      MYSQL_USER: joomlauser
+      MYSQL_PASSWORD: joomlapass
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # ─────────────────────────────
+  # Aplicação Joomla (PHP + Apache)
+  # ─────────────────────────────
+  joomla:
+    image: joomla:5-apache
+    container_name: joomla_app
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      JOOMLA_DB_HOST: mysql
+      JOOMLA_DB_NAME: joomla
+      JOOMLA_DB_USER: joomlauser
+      JOOMLA_DB_PASSWORD: joomlapass
+    volumes:
+      - joomla_data:/var/www/html
+
+  # ─────────────────────────────
+  # Nginx 1.28 com TLS 1.3 (Proxy)
+  # ─────────────────────────────
+  nginx:
+    image: nginx:1.28
+    container_name: joomla_nginx
+    restart: unless-stopped
+    depends_on:
+      - joomla
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+volumes:
+  db_data:
+  joomla_data:

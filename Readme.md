@@ -132,3 +132,20 @@ docker compose up -d
 
 **📖 Documentação Completa com Prints e Tutorial Passo a Passo:**  
 → [**docs/packages/assignature/README.md**](./docs/packages/assignature/README.md)
+
+---
+
+## 🛡️ 6. Laboratório de Firewall Avançado: IPTables e IPFW
+
+Atividade profissional simulando um gateway de segurança completo projetado com políticas padrão restritivas (Default DROP).
+
+**📋 Requisitos atendidos:**
+- ✅ Implementações em **Debian 13.x (IPTables)** e **FreeBSD 15.x (IPFW)**.
+- ✅ Rede dividida em WAN, DMZ isolada (Joomla e DBs) e LAN Administrativa.
+- ✅ Regras de **NAT Reverso (DNAT)** para publicação dos Servidores Web via porta 80/443.
+- ✅ Regras de **NAT (SNAT/Masquerade)** com *controle de horário* (Módulo Time) liberando internet apenas no almoço e após 18h.
+- ✅ Controles de **Stateful Inspection**, rejeitando ICMP externo, spoofing, tcp limit-burst (synflood) e portscan.
+- ✅ Auditabilidade isolada (LOG target) rastreando SSH, MySQL e PostgreSQL vindos da máquina Windows (Admin).
+
+**📖 Código das Regras e Roteiro de Testes Automáticos com Python Nativo:**  
+→ [**apps/firewall-lab/README.md**](./apps/firewall-lab/README.md)

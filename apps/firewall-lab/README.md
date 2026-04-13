@@ -2,6 +2,8 @@
 
 Atividade profissional e avançada demonstrando a criação de regras de mitigação, proteção de infraestrutura (Stateful Inspection), Network Address Translation (NAT) e logging isolado de pacotes em dois sistemas distintos.
 
+![Schema](./assets/schema.png)
+
 ## 📋 Topologia da Rede
 *   **Servidor Firewall:**
     *   WAN (`172.16.90.1`) - Interface de conexão Externa/Internet.

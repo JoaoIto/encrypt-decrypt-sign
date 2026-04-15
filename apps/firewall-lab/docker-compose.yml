@@ -1,0 +1,114 @@
+# apps/firewall-lab/docker-compose.yml
+# Subnets ajustados para evitar conflito com VirtualBox (192.168.56.x)
+# e Docker bridges padrão (172.17.x). Topologia lógica preservada.
+services:
+
+  # ---------------------------------------------------------
+  # VM 1: FIREWALL / GATEWAY (Debian 13)
+  # ---------------------------------------------------------
+  firewall:
+    image: debian:13-slim
+    container_name: fw-gateway
+    privileged: true
+    networks:
+      wan_net:
+        ipv4_address: 10.100.90.1
+      dmz_net:
+        ipv4_address: 10.100.56.254
+      lan_net:
+        ipv4_address: 10.100.57.254
+    command: >
+      sh -c "apt-get update -qq &&
+             apt-get install -y -qq iptables iproute2 net-tools iputils-ping procps curl chrony &&
+             echo 'server a.ntp.br iburst' > /etc/chrony/chrony.conf &&
+             echo 'server b.ntp.br iburst' >> /etc/chrony/chrony.conf &&
+             echo 'server c.ntp.br iburst' >> /etc/chrony/chrony.conf &&
+             echo 'makestep 1.0 3' >> /etc/chrony/chrony.conf &&
+             chronyd &&
+             echo 'NTP Configurado: a.ntp.br b.ntp.br c.ntp.br' &&
+             echo 'fw-gateway pronto!' &&
+             tail -f /dev/null"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+  # ---------------------------------------------------------
+  # VM 2: DMZ - JOOMLA (App Server) — IP lógico: 192.168.56.10
+  # ---------------------------------------------------------
+  joomla:
+    image: joomla:5-apache
+    container_name: joomla-dmz
+    restart: on-failure
+    depends_on:
+      db-dmz:
+        condition: service_healthy
+    environment:
+      JOOMLA_DB_HOST: db-dmz
+      JOOMLA_DB_USER: joomlauser
+      JOOMLA_DB_PASSWORD: joomlapass
+      JOOMLA_DB_NAME: joomla
+    networks:
+      dmz_net:
+        ipv4_address: 10.100.56.10
+
+  # ---------------------------------------------------------
+  # VM 3: DMZ - DATABASES (MySQL) — IP lógico: 192.168.56.20
+  # ---------------------------------------------------------
+  db-dmz:
+    image: mysql:8.0
+    container_name: db-dmz
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: joomla
+      MYSQL_USER: joomlauser
+      MYSQL_PASSWORD: joomlapass
+    networks:
+      dmz_net:
+        ipv4_address: 10.100.56.20
+
+  # ---------------------------------------------------------
+  # VM 4: CLIENTE WINDOWS — IP lógico: 192.168.57.30
+  # ---------------------------------------------------------
+  client-win:
+    image: debian:13-slim
+    container_name: client-win
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      lan_net:
+        ipv4_address: 10.100.57.30
+    command: >
+      sh -c "apt-get update -qq &&
+             apt-get install -y -qq iproute2 net-tools iputils-ping curl python3 &&
+             echo 'client-win pronto!' &&
+             tail -f /dev/null"
+
+networks:
+  wan_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.100.90.0/24
+          gateway: 10.100.90.254
+
+  dmz_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.100.56.0/24
+          gateway: 10.100.56.253
+
+  lan_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.100.57.0/24
+          gateway: 10.100.57.253

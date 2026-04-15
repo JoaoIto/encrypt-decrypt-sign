@@ -1,112 +1,137 @@
 #!/bin/sh
 # ==============================================================================
-# Laboratório de Firewall - IPFW (FreeBSD 15.x)
+# Laboratorio de Firewall - IPFW (FreeBSD 15.x) - Questao 2
+# Atividade: Direito e Seguranca da Informacao
 # ==============================================================================
+#
+# PRE-REQUISITOS no /etc/rc.conf:
+#   firewall_enable="YES"
+#   firewall_script="/root/firewall_ipfw.sh"
+#   gateway_enable="YES"
+#
+# Rodar: sh /root/firewall_ipfw.sh
 
-# Executar como: sh firewall_ipfw.sh
-# Certifique-se de habilitar no /etc/rc.conf:
-# firewall_enable="YES"
-# firewall_script="/caminho/para/firewall_ipfw.sh"
-# gateway_enable="YES"
-# natd_enable="YES" (ou kernel nat configurado)
+IPFW="/sbin/ipfw -q"
 
-# Comando base do ipfw
-IPFW="/sbin/ipfw"
-
-# Variáveis Globais de Redes e Interfaces (Ajustar as interfaces conforme VM)
+# ---- Interfaces (ajustar conforme ifconfig -a na sua VM) ----
 IF_WAN="em0"
 IF_DMZ="em1"
 IF_LAN="em2"
 
-IP_WAN="172.16.90.1"
-NET_DMZ="192.168.56.0/24"
-NET_LAN="192.168.57.0/24"
+# ---- Enderecos IP ----
+IP_WAN="10.100.90.1"
+NET_DMZ="10.100.56.0/24"
+NET_LAN="10.100.57.0/24"
+SRV_WEB="10.100.56.10"
+SRV_DB="10.100.56.20"
+WIN_CLIENT="10.100.57.30"
 
-# Servidores Específicos
-SRV_WEB="192.168.56.10"
-SRV_DB="192.168.56.20"
-WIN_CLIENT="192.168.57.30"
-
-# ==============================================================================
-# 1. Preparação e Limpeza
-# ==============================================================================
-echo "Limpando regras do IPFW..."
-${IPFW} -q flush
-${IPFW} -q nat 1 config
+echo "=== Iniciando configuracao do IPFW ==="
 
 # ==============================================================================
-# 2. Configuração de NAT e Translators (DNAT / SNAT)
+# 1. Limpeza e habilitacao do roteamento
 # ==============================================================================
-# O NAT do IPFW requer configuração prévia do alvo de NAT
-echo "Configurando Instâncias de NAT..."
+${IPFW} flush
+sysctl -q -w net.inet.ip.forwarding=1
+sysctl -q -w net.inet.ip.fw.verbose=1
+sysctl -q -w net.inet.ip.fw.verbose_limit=0
 
-# Redirecionamento 80 e 443 externos -> 192.168.56.10 na DMZ
-${IPFW} -q nat 1 config if ${IF_WAN} reset same_ports \
-    redirect_port tcp ${SRV_WEB}:80 80 \
+# ==============================================================================
+# 2. Loopback - sempre livre
+# ==============================================================================
+${IPFW} add 100 allow ip from any to any via lo0
+
+# ==============================================================================
+# 3. DNAT (NAT reverso) - Joomla exposto na WAN portas 80 e 443
+# ==============================================================================
+# Configurar instancia de NAT: SNAT + DNAT
+${IPFW} nat 1 config if ${IF_WAN} reset same_ports \
+    redirect_port tcp ${SRV_WEB}:80  80  \
     redirect_port tcp ${SRV_WEB}:443 443
 
-# ==============================================================================
-# 3. Regras Globais e Proteções de Baixo Nível (Anti-Spoofing, TCP, Synflood)
-# ==============================================================================
-# Desviar o tráfego de interface NAT para tradução imediata:
-${IPFW} -q add 00100 nat 1 ip from any to any via ${IF_WAN}
-
-# Tráfego Loopback sempre livre
-${IPFW} -q add 00500 allow ip from any to any via lo0
-
-# Rejeitar requisições ICMP externas (Ping of Death) na WAN
-${IPFW} -q add 01000 deny icmp from any to any via ${IF_WAN} icmptypes 8
-
-# Controle de conexões dinâmicas e state tracking (Stateful Inspection)
-${IPFW} -q add 02000 check-state
-
-# Anti-spoofing
-${IPFW} -q add 02100 deny ip from any to any not antispoof
-
-# Proteção contra synflood com 'limit src-addr' (State limita pacotes)
-# Todas regras de tcp stateful já cuidam de "flags tcp incompletas" se aplicarmos setup.
-# Mitigando flags quebradas:
-${IPFW} -q add 02300 deny tcp from any to any tcpflags fin,syn,rst,psh,ack,urg
+# Aplicar NAT em todo trafego que passa pela WAN
+${IPFW} add 200 nat 1 ip from any to any in  via ${IF_WAN}
+${IPFW} add 210 nat 1 ip from any to any out via ${IF_WAN}
 
 # ==============================================================================
-# 4. Políticas de Acesso e Controle Específico
+# 4. Stateful Inspection (conexoes estabelecidas e relacionadas)
 # ==============================================================================
-echo "Aplicando Políticas de Segmentação (LAN/DMZ)..."
-
-# O cliente Windows (192.168.57.30) pode acessar servidores na DMZ via SSH(22), MySQL(3306), Postgres(5432)
-# Registrando log ('log' antes da action)
-${IPFW} -q add 03000 allow log tcp from ${WIN_CLIENT} to ${SRV_WEB} 22 setup keep-state
-${IPFW} -q add 03010 allow log tcp from ${WIN_CLIENT} to ${SRV_DB} 22 setup keep-state
-${IPFW} -q add 03020 allow log tcp from ${WIN_CLIENT} to ${SRV_DB} 3306 setup keep-state
-${IPFW} -q add 03030 allow log tcp from ${WIN_CLIENT} to ${SRV_DB} 5432 setup keep-state
-
-# Os demais hosts da rede local somente poderão acessar via porta 80 e 443.
-${IPFW} -q add 04000 allow tcp from ${NET_LAN} to ${NET_DMZ} 80 setup keep-state
-${IPFW} -q add 04010 allow tcp from ${NET_LAN} to ${NET_DMZ} 443 setup keep-state
-# Bloqueia outros acessos de LAN para DMZ que não bateram na regra
-${IPFW} -q add 04099 deny ip from ${NET_LAN} to ${NET_DMZ}
-
-# Acesso irrestrito entre WAN e Servidor Web nas portas espelhadas no DNAT
-${IPFW} -q add 05000 allow tcp from any to ${SRV_WEB} 80 setup limit src-addr 20
-${IPFW} -q add 05010 allow tcp from any to ${SRV_WEB} 443 setup limit src-addr 20
+${IPFW} add 500 check-state
 
 # ==============================================================================
-# 5. Controle de Horário para Acesso Externo
+# 5. Protecao ICMP externo (sem ping da internet para o firewall)
 # ==============================================================================
-# Regras baseadas em tempo (12-14h e 18h+) devem ser mantidas
-# O cron é uma forma, ou usar as flags de tempo do ipfw (mac time não é nativo, requer compilação kernel ou cron)
-# Simularemos a sintaxe de cron ou a restrição comportamental de FreeBSD
-# NOTA: O freebsd ipfw possui as diretivas 'time' nativamente nos scripts mais modernos ou requer daemon
-# Exemplo genérico usando os modificadores do tempo real suportado pelo IPFW (se compilado):
-${IPFW} -q add 06000 allow ip from ${NET_LAN} to any out via ${IF_WAN} setup keep-state # (Necessita Cronjob para ativar/desativar se n for Kernel time)
-${IPFW} -q add 06010 allow ip from ${NET_DMZ} to any out via ${IF_WAN} setup keep-state # (Necessita Cronjob para ativar/desativar se n for Kernel time)
-
-# Serviços locais (NTP) saindo do firewall para porta 123
-${IPFW} -q add 07000 allow udp from me to any 123 keep-state
+${IPFW} add 1000 deny  icmp from any to any in  via ${IF_WAN} icmptypes 8
+${IPFW} add 1010 allow icmp from any to any via ${IF_DMZ}
+${IPFW} add 1020 allow icmp from any to any via ${IF_LAN}
 
 # ==============================================================================
-# Default Drop (Fechamento)
+# 6. Protecao contra TCP flags invalidas (NULL scan, XMAS scan)
 # ==============================================================================
-${IPFW} -q add 65534 deny log ip from any to any
+${IPFW} add 1100 deny tcp from any to any tcpflags fin,syn,rst,psh,ack,urg
+${IPFW} add 1110 deny tcp from any to any tcpflags !fin,!syn,!rst,!psh,!ack,!urg
+${IPFW} add 1120 deny tcp from any to any established tcpflags !ack
 
-echo "Firewall IPFW (FreeBSD) ativado e configurado!"
+# ==============================================================================
+# 7. Anti-Spoofing e Source Routing
+# ==============================================================================
+${IPFW} add 1200 deny ip from any to any not antispoof in via ${IF_LAN}
+${IPFW} add 1210 deny ip from any to any not antispoof in via ${IF_DMZ}
+
+# ==============================================================================
+# 8. Protecao contra SYN Flood (limite de conexoes por IP de origem)
+# ==============================================================================
+${IPFW} add 1300 allow tcp from any to ${SRV_WEB} 80  setup limit src-addr 20 keep-state
+${IPFW} add 1310 allow tcp from any to ${SRV_WEB} 443 setup limit src-addr 20 keep-state
+
+# ==============================================================================
+# 9. ACL - Cliente Windows (10.100.57.30) -> portas 22, 3306, 5432 com LOG
+# ==============================================================================
+${IPFW} add 3000 allow log tcp from ${WIN_CLIENT} to ${SRV_WEB} 22   setup keep-state
+${IPFW} add 3010 allow log tcp from ${WIN_CLIENT} to ${SRV_DB}  22   setup keep-state
+${IPFW} add 3020 allow log tcp from ${WIN_CLIENT} to ${SRV_DB}  3306 setup keep-state
+${IPFW} add 3030 allow log tcp from ${WIN_CLIENT} to ${SRV_DB}  5432 setup keep-state
+
+# ==============================================================================
+# 10. LAN -> DMZ: apenas portas 80 e 443 para demais hosts
+# ==============================================================================
+${IPFW} add 4000 allow tcp from ${NET_LAN} to ${NET_DMZ} 80  setup keep-state
+${IPFW} add 4010 allow tcp from ${NET_LAN} to ${NET_DMZ} 443 setup keep-state
+${IPFW} add 4099 deny  log ip from ${NET_LAN} to ${NET_DMZ}
+
+# ==============================================================================
+# 11. NTP (porta 123 UDP) - sai do firewall para servidores NTP
+# ==============================================================================
+${IPFW} add 5000 allow udp from me to any 123 keep-state
+${IPFW} add 5010 allow udp from any 123 to me keep-state
+
+# ==============================================================================
+# 12. SSH de administracao: apenas da LAN para o proprio firewall
+# ==============================================================================
+${IPFW} add 5100 allow tcp from ${NET_LAN} to me 22 setup keep-state
+
+# ==============================================================================
+# 13. Saida do firewall e respostas (OUTPUT generoso para o proprio gateway)
+# ==============================================================================
+${IPFW} add 6000 allow tcp from me to any setup keep-state
+${IPFW} add 6010 allow udp from me to any keep-state
+
+# ==============================================================================
+# 14. SNAT com restricao de horario (via cron - veja crontab abaixo)
+#     A regra base e adicionada/removida pelo cron nos horarios certos:
+#     12h-14h Brasilia (15h-17h UTC) e 18h+ (21h+ UTC)
+#     A regra abaixo e o placeholder que o cron ativa/desativa
+# ==============================================================================
+# Descomentada pelo cron no horario permitido:
+# ${IPFW} add 6500 allow ip from ${NET_LAN} to any out via ${IF_WAN} keep-state
+# ${IPFW} add 6510 allow ip from ${NET_DMZ} to any out via ${IF_WAN} keep-state
+
+# ==============================================================================
+# 15. Regra final: bloquear e registrar tudo que nao foi permitido
+# ==============================================================================
+${IPFW} add 65534 deny log ip from any to any
+
+echo "=== IPFW configurado com sucesso! ==="
+echo ""
+echo "Regras aplicadas:"
+/sbin/ipfw -a list | head -40

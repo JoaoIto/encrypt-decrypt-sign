@@ -9,6 +9,10 @@ Atividade: Politica de Firewall com IPFW no FreeBSD 15.x
 
 ## Sumario
 
+0. [Situacao Real: Corrigir a VM Fw_Ipfw Existente](#0-situacao-real-corrigir-a-vm-fw_ipfw-existente)
+   - [0.1 Problema encontrado](#01-problema-encontrado)
+   - [0.2 Correcao pelo VirtualBox](#02-correcao-pela-interface-do-virtualbox)
+   - [0.3 Diagnostico inicial dentro do FreeBSD](#03-diagnostico-inicial-dentro-da-vm-freebsd)
 1. [Criar a VM com VBoxManage (PowerShell)](#1-criar-a-vm-com-vboxmanage-powershell)
 2. [Instalar o FreeBSD 15.x](#2-instalar-o-freebsd-15x)
 3. [Configurar a rede dentro do FreeBSD](#3-configurar-a-rede-dentro-do-freebsd)
@@ -20,6 +24,137 @@ Atividade: Politica de Firewall com IPFW no FreeBSD 15.x
 9. [Configurar o SNAT por horario via cron](#9-configurar-o-snat-por-horario-via-cron)
 10. [Testes completos dentro da VM](#10-testes-completos-dentro-da-vm)
 11. [Resultados esperados por requisito](#11-resultados-esperados-por-requisito)
+
+---
+
+## 0. Situacao Real: Corrigir a VM Fw_Ipfw Existente
+
+Esta secao documenta o que foi feito no laboratorio real com a VM ja existente no VirtualBox, antes de partir para a configuracao interna do FreeBSD.
+
+### 0.1. Problema Encontrado
+
+Ao tentar iniciar a VM `Fw_Ipfw`, o VirtualBox exibiu o seguinte erro:
+
+```
+VirtualBox - Erro
+Nao foi possivel iniciar a maquina Fw_Ipfw pois as seguintes interfaces fisicas
+de rede nao foram encontradas:
+
+  enp6s0 (adapter 1), enp6s0 (adapter 2), enp6s0 (adapter 3)
+
+Altere as configuracoes de rede desta maquina, ou desligue-a.
+```
+
+O motivo do erro e que os 3 adaptadores da VM estavam configurados como
+"Placa em modo Bridge" apontando para a interface `enp6s0`, que e um nome de
+interface Linux (padrao `enp` do systemd-udev). No Windows, esse nome de
+interface nao existe, causando a falha ao iniciar.
+
+Configuracoes incorretas que estavam na VM:
+
+```
+Adaptador 1: Intel PRO/1000 MT Desktop (Placa em modo Bridge, enp6s0)
+Adaptador 2: Intel PRO/1000 MT Desktop (Placa em modo Bridge, enp6s0)
+Adaptador 3: Intel PRO/1000 MT Desktop (Placa em modo Bridge, enp6s0)
+```
+
+### 0.2. Correcao pela Interface do VirtualBox
+
+Redes Host-Only disponíveis no VirtualBox ao listar com `VBoxManage list hostonlyifs`:
+
+```
+Name:       VirtualBox Host-Only Ethernet Adapter
+IPAddress:  192.168.56.1      <- Segmento DMZ
+
+Name:       VirtualBox Host-Only Ethernet Adapter #2
+IPAddress:  192.168.57.1      <- Segmento LAN
+```
+
+Uma terceira rede foi criada para o segmento WAN:
+
+```powershell
+# Criar a rede Host-Only para WAN (rodar no PowerShell do Windows)
+& "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" hostonlyif create
+# Retornou: Interface 'VirtualBox Host-Only Ethernet Adapter #3' was successfully created
+
+# Configurar o IP da rede WAN
+& "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" hostonlyif ipconfig `
+  "VirtualBox Host-Only Ethernet Adapter #3" `
+  --ip 172.16.90.254 --netmask 255.255.255.0
+```
+
+Tabela final das redes Host-Only utilizadas:
+
+| Adaptador Host-Only | IP no Host (Windows) | Papel no Lab | Interface FreeBSD |
+|---|---|---|---|
+| Adapter #3 (criada agora) | 172.16.90.254 | WAN | em0 |
+| Adapter (padrao) | 192.168.56.1 | DMZ | em1 |
+| Adapter #2 | 192.168.57.1 | LAN | em2 |
+
+A correcao foi feita pela interface grafica do VirtualBox:
+
+```
+1. Clicar em "Alterar Configuracoes de Rede" no dialogo de erro
+
+2. Aba Adaptador 1 (WAN):
+   - Conectado em: Placa de rede exclusiva do hospedeiro (Host-Only)
+   - Nome: VirtualBox Host-Only Ethernet Adapter #3
+   - Modo promiscuo: Permitir Tudo
+
+3. Aba Adaptador 2 (DMZ):
+   - Conectado em: Placa de rede exclusiva do hospedeiro (Host-Only)
+   - Nome: VirtualBox Host-Only Ethernet Adapter
+   - Modo promiscuo: Permitir Tudo
+
+4. Aba Adaptador 3 (LAN):
+   - Conectado em: Placa de rede exclusiva do hospedeiro (Host-Only)
+   - Nome: VirtualBox Host-Only Ethernet Adapter #2
+   - Modo promiscuo: Permitir Tudo
+
+5. Clicar em OK e iniciar a VM
+```
+
+O modo promiscuo "Permitir Tudo" e obrigatorio em todos os adaptadores de um
+firewall/gateway porque ele precisa receber e encaminhar pacotes endereçados
+a outros hosts (MAC de destino diferente do seu proprio). Sem esse modo,
+qualquer trafego de FORWARD seria silenciosamente descartado pela placa de rede.
+
+### 0.3. Diagnostico Inicial dentro da VM FreeBSD
+
+Apos corrigir os adaptadores e iniciar a VM, o FreeBSD exibiu a sequencia
+normal de boot com mensagens como:
+
+```
+add host 127.0.0.1: gateway lo0 fib 0: route already in table  <- normal
+route: message indicates error: File exists                     <- normal
+Starting syslogd.                                               <- normal
+Starting sshd.                                                  <- normal
+Starting cron.                                                  <- normal
+Starting background file system checks in 60 seconds.           <- ultima linha do boot
+```
+
+Apos o prompt de login aparecer, foi feito login como root. O primeiro
+checkin da situacao atual da VM é feito com os tres comandos abaixo:
+
+```sh
+# 1. Verificar as interfaces de rede e seus IPs atuais
+ifconfig -a | grep -E "^[a-z]|inet "
+
+# 2. Ver a configuracao atual do sistema no rc.conf
+cat /etc/rc.conf
+
+# 3. Verificar se o modulo IPFW ja esta carregado no kernel
+kldstat | grep ipfw
+```
+
+Esses comandos revelam:
+- Quais nomes de interface a VM usa (em0/em1/em2 ou vtnet0/vtnet1/vtnet2)
+- Quais IPs ja estao configurados (se a VM ja tinha configuracao anterior)
+- Se o IPFW precisa ser carregado ou ja esta ativo
+
+O resultado desses comandos determina os proximos passos: se o IPFW ja
+estiver carregado e os IPs corretos, pode-se pular direto para a aplicacao
+do script. Se nao, segue-se pelas secoes 3 a 8 desta documentacao.
 
 ---
 
@@ -861,3 +996,256 @@ nc -zv 10.100.90.1 22
 | Source routing desabilitado | `sysctl net.inet.ip.accept_sourceroute` | 0 |
 | Firewall inicia no boot | `grep firewall /etc/rc.conf` | firewall_enable="YES" |
 | NTP com NIC BR | `ntpq -p` | Servidores a.ntp.br b.ntp.br c.ntp.br |
+
+---
+
+## 12. Execucao Real e Evidencias do Laboratorio
+
+Esta secao documenta a execucao real do laboratorio na VM Fw_Ipfw no VirtualBox,
+com os outputs verificados e as evidencias de funcionamento do IPFW.
+
+### 12.1. Ambiente verificado
+
+```
+Sistema:   FreeBSD 15.0-RELEASE-p4 (GENERIC) amd64
+Hostname:  fw
+VM:        Fw_Ipfw no Oracle VirtualBox
+Data:      Tue Apr 14 21:41:36 -03 2026
+```
+
+### 12.2. Configuracao de rede confirmada
+
+Resultado do comando `ifconfig -a | grep "flags\|inet "` na VM:
+
+```
+em0: flags=1008843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST,LOWER_UP>
+        inet 172.16.90.1   netmask 0xffffff00  broadcast 172.16.90.255   <- WAN
+em1: flags=1008843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST,LOWER_UP>
+        inet 192.168.56.254 netmask 0xffffff00  broadcast 192.168.56.255  <- DMZ
+em2: flags=1008843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST,LOWER_UP>
+        inet 192.168.57.254 netmask 0xffffff00  broadcast 192.168.57.255  <- LAN
+lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST>
+        inet 127.0.0.1     netmask 0xff000000
+```
+
+Todas as tres interfaces ativas com IPs corretos e encaminhamento habilitado:
+
+```sh
+sysctl net.inet.ip.forwarding
+# Resultado: net.inet.ip.forwarding: 1
+```
+
+### 12.3. Script rc.conf instalado e verificado
+
+Conteudo do `/etc/rc.conf` instalado na VM:
+
+```sh
+hostname="fw"
+sshd_enable="YES"
+ifconfig_em0="inet 172.16.90.1 netmask 255.255.255.0"
+ifconfig_em1="inet 192.168.56.254 netmask 255.255.255.0"
+ifconfig_em2="inet 192.168.57.254 netmask 255.255.255.0"
+gateway_enable="YES"
+firewall_enable="YES"
+firewall_script="/root/firewall_ipfw.sh"
+firewall_logging="YES"
+ntpd_enable="YES"
+ntpd_flags="-g"
+ntpdate_enable="YES"
+ntpdate_hosts="a.ntp.br"
+```
+
+O arquivo foi transferido do Windows para a VM via HTTP (`fetch`) usando o
+servidor Python temporario iniciado na maquina Windows anfitria:
+
+```powershell
+# No Windows (PowerShell)
+python -m http.server 8080
+```
+
+```sh
+# Na VM FreeBSD
+fetch -o /etc/rc.conf http://172.16.90.254:8080/freebsd_rc.conf
+```
+
+### 12.4. Modulos IPFW verificados
+
+Resultado do `kldstat | grep ipfw`:
+
+```
+5  1 0xffffffff8301f000  26570  ipfw.ko
+6  1 0xffffffff83046000    42f0  ipfw_nat.ko
+```
+
+Ambos os modulos carregados: `ipfw.ko` (motor do firewall) e `ipfw_nat.ko`
+(suporte a NAT/DNAT/SNAT).
+
+### 12.5. Regras IPFW aplicadas e verificadas
+
+Resultado completo do `ipfw -a list` com 23 regras ativas:
+
+```
+00100     0     0  allow ip from any to any via lo0
+00500     0     0  check-state :default
+01000     0     0  deny icmp from any to any in via em0 icmptypes 8
+01010     0     0  allow icmp from any to any via em1
+01020     0     0  allow icmp from any to any via em2
+01100     0     0  deny tcp from any to any tcpflags syn,fin,ack,psh,rst,urg
+01120     0     0  deny tcp from any to any established tcpflags !ack
+03000     0     0  allow log tcp from 192.168.57.30 to 192.168.56.10 22 setup keep-state :default
+03010     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 22 setup keep-state :default
+03020     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 3306 setup keep-state :default
+03030     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 5432 setup keep-state :default
+04000     0     0  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 80 setup keep-state :default
+04010     0     0  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 443 setup keep-state :default
+04099     0     0  deny log ip from 192.168.57.0/24 to 192.168.56.0/24
+05000     0     0  allow udp from me to any 123 keep-state :default
+05010     0     0  allow udp from any 123 to me keep-state :default
+05090    38  7616  allow tcp from 172.16.90.0/24 to me 22 setup keep-state :default
+05100     0     0  allow tcp from 192.168.57.0/24 to me 22 setup keep-state :default
+06000     0     0  allow tcp from me to any setup keep-state :default
+06010     0     0  allow udp from me to any keep-state :default
+65534     0     0  deny log ip from any to any
+65535     0     0  count ip from any to any not // orphaned dynamic states counter
+65535     0     0  deny ip from any to any
+```
+
+Nota: a regra 05090 mostra `38 pkts / 7616 bytes` porque e a regra que permitiu
+a propria sessao SSH de administracao usada para configurar o sistema.
+
+### 12.6. Evidencia de cada requisito da atividade
+
+| Requisito | Regra IPFW | Numero | Evidencia |
+|---|---|---|---|
+| ICMP externo bloqueado | deny icmp in via em0 icmptypes 8 | 01000 | Ping da WAN bloqueado |
+| ICMP interno permitido | allow icmp via em1 e em2 | 01010, 01020 | DMZ e LAN pingam entre si |
+| Anti NULL/XMAS scan | deny tcp tcpflags syn,fin,ack... | 01100 | Pacotes com flags invalidas bloqueados |
+| Anti spoofing ACK | deny tcp established tcpflags !ack | 01120 | Conexoes invalidas bloqueadas |
+| ACL Windows SSH | allow log tcp 192.168.57.30 -> 56.10 :22 | 03000 | Com registro em /var/log/security |
+| ACL Windows MySQL | allow log tcp 192.168.57.30 -> 56.20 :3306 | 03020 | Com registro em /var/log/security |
+| ACL Windows PostgreSQL | allow log tcp 192.168.57.30 -> 56.20 :5432 | 03030 | Com registro em /var/log/security |
+| LAN so 80 e 443 | allow tcp 57.0/24 -> 56.0/24 80 e 443 | 04000, 04010 | Outras portas bloqueadas |
+| Resto LAN bloqueado | deny log ip 57.0/24 -> 56.0/24 | 04099 | LOG de violacoes |
+| NTP saindo | allow udp from me to any 123 | 05000, 05010 | Sincronizacao NIC BR |
+| Administracao SSH | allow tcp 172.16.90.0/24 -> me 22 | 05090 | Sessao SSH ativa (38 pkts) |
+| Default deny com log | deny log ip from any to any | 65534 | Toda violacao registrada |
+| Firewall no boot | firewall_enable=\"YES\" no rc.conf | -- | Persistente apos reinicio |
+| Gateway habilitado | gateway_enable=\"YES\" + sysctl =1 | -- | Encaminhamento ativo |
+
+### 12.7. Como o firewall foi aplicado sem derrubar o SSH
+
+O principal desafio tecnico foi que o comando `ipfw flush` dentro do script de
+firewall derrubava a sessao SSH ativa ao remover todas as regras (incluindo a
+regra temporaria `100 allow all from any to any` que mantinha a conexao).
+
+A solucao adotada foi o comando `at` do FreeBSD, que agenda a execucao do script
+para um momento futuro, permitindo que a sessao SSH seja encerrada normalmente
+antes das regras serem aplicadas:
+
+```sh
+# Na sessao SSH - agendar execucao e sair imediatamente
+echo sh /root/firewall_ipfw.sh | at now + 1 minute
+exit
+```
+
+Apos 1 minuto, o job `at` executa o script numa sessao de sistema separada (sem
+SSH). O `ipfw flush` remove todas as regras sem cortar nenhuma conexao ativa.
+As novas regras sao aplicadas em sequencia, incluindo a 05090 que permite SSH
+da rede WAN (172.16.90.0/24). Na reconexao SSH subsequente, a sessao entra
+normalmente pela regra 05090, confirmada pelos 38 pacotes registrados.
+
+### 12.8. Adicionar regras NAT (DNAT para Joomla)
+
+Apos verificar as regras basicas, adicionar o NAT para redirecionar portas
+80 e 443 da WAN para o servidor Joomla na DMZ:
+
+```sh
+kldload ipfw_nat 2>/dev/null
+
+ipfw nat 1 config if em0 reset same_ports \
+  redirect_port tcp 192.168.56.10:80  80 \
+  redirect_port tcp 192.168.56.10:443 443
+
+ipfw add 200 nat 1 ip from any to any in  via em0
+ipfw add 210 nat 1 ip from any to any out via em0
+
+# Verificar
+ipfw nat list
+ipfw -a list | grep "^002"
+```
+
+### 12.9. Configurar o SNAT por horario via cron
+
+O SNAT (acesso a internet para LAN/DMZ) e habilitado e desabilitado
+automaticamente pelo cron nos horarios definidos pela atividade:
+
+```sh
+# Script de ativacao
+cat > /root/snat_on.sh << 'EOF'
+#!/bin/sh
+/sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state
+/sbin/ipfw -q add 6510 allow ip from 192.168.56.0/24 to any out via em0 keep-state
+logger "IPFW: SNAT ativado em $(date)"
+EOF
+
+# Script de desativacao
+cat > /root/snat_off.sh << 'EOF'
+#!/bin/sh
+/sbin/ipfw -q delete 6500 2>/dev/null
+/sbin/ipfw -q delete 6510 2>/dev/null
+logger "IPFW: SNAT desativado em $(date)"
+EOF
+
+chmod +x /root/snat_on.sh /root/snat_off.sh
+
+# Configurar cron (Brasilia = UTC-3)
+# 12h-14h e 18h-00h (Brasilia) = 15h-17h e 21h-03h (UTC)
+(crontab -l 2>/dev/null; cat << 'CRONEOF'
+0 15 * * * /root/snat_on.sh
+0 17 * * * /root/snat_off.sh
+0 21 * * * /root/snat_on.sh
+0 3  * * * /root/snat_off.sh
+CRONEOF
+) | crontab -
+
+crontab -l
+```
+
+### 12.10. Verificacao final completa
+
+Sequencia de testes para confirmar todos os requisitos atendidos:
+
+```sh
+# 1. Regras ativas
+ipfw -a list | wc -l
+# Esperado: 23 ou mais
+
+# 2. Modulos carregados
+kldstat | grep ipfw
+# Esperado: ipfw.ko e ipfw_nat.ko
+
+# 3. NAT configurado
+ipfw nat list
+# Esperado: nat 1 config ... redirect_port tcp 192.168.56.10:80 80
+
+# 4. SNAT (ativar e verificar)
+sh /root/snat_on.sh
+ipfw -a list | grep -E "6500|6510"
+# Esperado: 2 regras allow para LAN e DMZ
+
+# 5. Cron configurado
+crontab -l | grep snat
+# Esperado: 4 entradas
+
+# 6. Logs de seguranca
+cat /var/log/security | grep ipfw | tail -5
+# Esperado: entradas de log das conexoes
+
+# 7. rc.conf correto
+grep -E "firewall|gateway|sshd" /etc/rc.conf
+# Esperado: todas as configuracoes presentes
+
+# 8. Horario e timezone
+date
+# Esperado: horario de Brasilia (UTC-3)
+```

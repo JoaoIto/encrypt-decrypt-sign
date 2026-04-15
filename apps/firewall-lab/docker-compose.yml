@@ -39,6 +39,9 @@ services:
     image: joomla:5-apache
     container_name: joomla-dmz
     restart: on-failure
+    ports:
+      - "80:80"
+      - "443:443"
     depends_on:
       db-dmz:
         condition: service_healthy

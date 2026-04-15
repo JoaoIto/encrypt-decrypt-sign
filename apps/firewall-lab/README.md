@@ -1,89 +1,96 @@
 # 🛡️ Laboratório de Firewall: IPTables e IPFW
 
-Atividade profissional e avançada demonstrando a criação de regras de mitigação, proteção de infraestrutura (Stateful Inspection), Network Address Translation (NAT) e logging isolado de pacotes em dois sistemas distintos.
+Atividade profissional e avançada demonstrando a criação de regras de mitigação, proteção de infraestrutura (Stateful Inspection), Network Address Translation (NAT) e logging isolado de pacotes em dois cenários distintos (Docker/IPTables e FreeBSD/IPFW).
 
 ![Schema](./assets/schema.png)
 
 ## 📋 Topologia da Rede
-*   **Servidor Firewall:**
-    *   WAN (`172.16.90.1`) - Interface de conexão Externa/Internet.
-    *   DMZ (`192.168.56.254`) - Gateway da Rede Desmilitarizada.
-    *   LAN (`192.168.57.254`) - Gateway da Rede Local de Clientes.
-*   **Servidores DMZ (192.168.56.0/24):**
-    *   Joomla 5 (Web): `192.168.56.10`
-    *   PostgreSQL/MySQL: `192.168.56.20`
-*   **Clientes LAN (192.168.57.0/24):**
-    *   Administrador Windows: `192.168.57.30`
+
+*   **Sistemas de Firewall:**
+    *   WAN (`10.100.90.1` no Docker ou `172.16.90.1` no FreeBSD) - Conexão Externa.
+    *   DMZ (`10.100.56.254` / `192.168.56.254`) - Gateway da Rede Desmilitarizada.
+    *   LAN (`10.100.57.254` / `192.168.57.254`) - Gateway da Rede Local.
+*   **Servidores DMZ:**
+    *   Joomla/Moodle Web (App): `.10` (Ex: `192.168.56.10` / `10.100.56.10`)
+    *   Banco de Dados (MariaDB/MySQL): `.20`
+*   **Clientes LAN:**
+    *   Administrador Windows: `.30`
+
+---
 
 ## ⚙️ Regras Aplicadas (Exigência do Projeto)
-- **Política Rígida (DROP)** em todos os fluxos.
-- **NAT:** Exposição das portas 80 e 443 do servidor web para a Internet via DNAT.
-- **Bloqueio Subjacente:** Recusa automática de ICMP externo, Flags TCP incompletas (State tracking), Anti-Scan e port-forward bloqueado para serviços internos críticos (MySQL/SSH).
-- **Controle de Horários:** Clientes LAN têm tráfego restrito de acesso externo para horário de almoço e noite.
-- **Log Específico:** Interceptação visual da porta de DBs e SSH para o usuário ADM Windows.
+
+- **NAT e Port Forwarding:** Exposição das portas 80 e 443 do servidor web Joomla simulando um ambiente Moodle para a Internet via DNAT.
+- **Segurança da WAN:** Recusa automática de `ICMP Echo Request` (Ping Externo), Bloqueio do SSH (`porta 22`) e portas de bancos de dados (`3306`, `5432`).
+- **Comunicação Interna:** Clientes LAN possuem acesso a serviços web na DMZ, com tráfego perfeitamente monitorado e restrito (Ex: Regras de horário da LAN para a WAN).
+- **Log Específico:** Interceptação dos acessos cruzados (ex: do Admin Windows para o MySQL de Log).
 
 ---
 
-## 🚀 1. Utilizando o IPTables (Debian Linux 13.x)
+## 🚀 Questão 1: IPTables (Simulação Dockerizada)
 
-O script Linux `firewall_iptables.sh` deve ser executado no boot da sua VM de roteador/gateway.
+A primeira parte do laboratório utiliza um ambiente totalmente conteinerizado (`docker-compose`) rodando em redes simuladas (`10.100.x.x`). 
 
+Neste cenário, usamos o `firewall_iptables.sh` rodando ativamente dentro de um gateway/firewall de sistema focado em Linux (`iptables`). 
+O ambiente funcionou de forma fluida após implementarmos `SNAT (Masquerade)` no tráfego direcionado para a própria rede interna afim de evitar problemas de "roteamento assimétrico" das requisições web, forçando o Container do Joomla a enviar a resposta estritamente pro Gateway.
+
+### Como Executar e Validar:
 ```bash
-chmod +x firewall_iptables.sh
-sudo ./firewall_iptables.sh
-```
+# Subir infraestrutura Web e BD
+docker compose up -d
 
-**Principais verificações no Linux:**
-```bash
-# Ver as regras de filtro
-iptables -L -v -n
-
-# Ver as regras de NAT (Port forwarding)
-iptables -t nat -L -v -n
-
-# Acompanhar os blocos e acessos do usuario ADM ao vivo:
-tail -f /var/log/kern.log | grep FW-WIN_ACCESS_ACCEPT
+# Executar o firewall no container designado como gateway
+docker exec -it fw-gateway sh /root/firewall_iptables.sh
 ```
 
 ---
 
-## 🚀 2. Utilizando o IPFW (FreeBSD 15.x)
+## 🚀 Questão 2: IPFW (FreeBSD no VirtualBox)
 
-Para utilizar o firewall BSD `firewall_ipfw.sh`, é necessário autorizá-lo a comandar as políticas do kernel:
+Na segunda etapa, integramos uma Máquina Virtual atuando como um roteador de borda oficial em FreeBSD que intermedia o tráfego da rede *Host-Only* para o Docker (no hospedeiro Windows). 
 
-1. Acesse o sistema e modifique o `/etc/rc.conf`:
-   ```bash
-   firewall_enable="YES"
-   firewall_script="/etc/firewall_ipfw.sh"
-   gateway_enable="YES"
-   natd_enable="YES"
-   ```
-2. Adicione e dê permissão para o script:
-   ```bash
-   chmod +x firewall_ipfw.sh
-   sh firewall_ipfw.sh
-   ```
+As configurações estão no script **`firewall_ipfw.sh`**. Tivemos que lidar com a arquitetura severa do firewall FreeBSD:
+1. **Driblando a Assimetria (Double NAT):** Implementamos dois NATs (`DNAT` da WAN e `SNAT` na saída da DMZ) para garantir que a requisição originada do Host navegasse para dentro de si e a resposta fosse forçada a retornar para o FreeBSD, em vez do Host encurtar caminho consumindo ele próprio (Loopback). 
+2. **Flag One Pass:** Desativamos o `sysctl net.inet.ip.fw.one_pass=0` para que pacotes pudessem circular nos dois módulos de NAT na mesma leitura ao invés de pular as regras de firewall na primeira conversão de IP.
 
-**Verificando as regras em runtime no BSD:**
+### Como Executar:
+Dentro do terminal do Firewall FreeBSD no VirtualBox, rode os comandos para buscar o script limpo e aplicá-lo:
 ```bash
-ipfw show
+# 1. Liberar temporariamente tráfego para baixar atualizações locais:
+/sbin/ipfw -q -f flush
+/sbin/ipfw add 1 allow ip from any to any
+
+# 2. Descarregar o script de regras hospedado no Windows:
+fetch -o /root/firewall_ipfw.sh http://192.168.56.1:8080/firewall_ipfw.sh
+
+# 3. Aplicar as Regras Exigidas:
+sh /root/firewall_ipfw.sh
 ```
 
 ---
 
-## 🧪 3. Prova de Funcionamento (Auditoria com Python)
+## 🧪 Auditoria de Segurança com Python
 
-Para documentar os acessos restritos, utilizamos o `test_firewall.py`. Este script foi escrito em puro Python (sem necessidade de pacotes externos, compatível com Python 3 em qualquer sistema).
+O arquivo `test_firewall.py` realiza um pentest interno (TCP Connect e ICMP Packets) validando se o roteador atende às políticas mínimas do Lab. É compatível para testar a Questão 1 (`10.100.90.1`) e Questão 2 (`172.16.90.1`).
 
-> **Atenção:** Deve ser executado em uma **Máquina Externa** conectada fisicamente ou via adaptador host-only para a rede associada à WAN do Firewall (`172...`).
-
-### Como Executar
-```bash
-python3 test_firewall.py
+```powershell
+python .\test_firewall.py
 ```
+**O script valida que:**
+1. Ping bloqueado (Proteção Anti-DDoS de pacotes de controle).
+2. Portas Web Autorizadas.
+3. Sessões Críticas Requerendo Tunneling Bloqueadas no Bordo Público (Firewall Externo Seguro).
 
-### O que acontece sob o capô?
-1. Efetua um pulso `ICMP Request` (Ping): Falha esperada pois o Firewall descarta na Chain de Input externa.
-2. Abre sockets de teste em portas permitidas (80, 443): Sucesso esperado (Redirecionamento para Joomla funcionando por DMZ).
-3. Abre sockets críticos de acesso administrativo (22, 3306, 5432): Timeout garantido pela premissa `DEFAULT DROP`.
-4. Os relatórios de segurança auditados em tela são simultaneamente injetados com datestamping no arquivo local de logs `relatorio_seguranca_YYYYMMDD.log`.
+---
+
+## 📸 Evidências / Screenshots
+
+*Aqui demonstramos o acesso final resolvido acessando a plataforma na nossa máquina Windows:*
+
+![Acesso ao Joomla pelo Browser no IP da WAN FreeBSD](./assets/print_joomla_browser.png)
+
+*Aplicação do Roteamento e Regras no FreeBSD IPFW:*
+
+![Shell FreeBSD aplicando Firewall IPFW](./assets/print_freebsd_shell.png)
+
+*(Coloque as imagens nos locais da pasta `assets/` e corrija os nomes se necessário).*

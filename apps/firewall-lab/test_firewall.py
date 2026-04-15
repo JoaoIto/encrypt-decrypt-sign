@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 # Configuração de IP Público (WAN) do Firewall que desejamos atacar/testar
+# Use 10.100.90.1 para Questão 1 (Docker) ou 172.16.90.1 para Questão 2 (FreeBSD)
 FIREWALL_IP = "172.16.90.1"
 
 # Portas a testar (Sucesso Esperado para Web, e Timeout/Refused para BD e SSH)

@@ -116,14 +116,19 @@ echo "  🔒 Source routing e IP redirects desabilitados."
 # ==============================================================================
 echo "➡️  Configurando DNAT (WAN → Joomla DMZ)..."
 
-# Redirecionar porta 80 e 443 externos para o servidor Joomla (192.168.56.10)
+# Redirecionar porta 80 e 443 externos para o servidor Joomla (porta 80 interna)
 iptables -t nat -A PREROUTING -i $IF_WAN -p tcp --dport 80  -j DNAT --to-destination $SRV_WEB:80
-iptables -t nat -A PREROUTING -i $IF_WAN -p tcp --dport 443 -j DNAT --to-destination $SRV_WEB:443
+iptables -t nat -A PREROUTING -i $IF_WAN -p tcp --dport 443 -j DNAT --to-destination $SRV_WEB:80
 
 # Autorizar o encaminhamento dessas conexões DNAT
 iptables -A FORWARD -i $IF_WAN -o $IF_DMZ -d $SRV_WEB -p tcp -m multiport --dports 80,443 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 
-echo "✅ DNAT: Portas 80/443 encaminhando para $SRV_WEB."
+# 🔥 SOLUÇÃO ROTEAMENTO ASSIMÉTRICO (Hairpin NAT):
+# Forçar as respostas do servidor a voltarem pelo gateway, mascarando o IP de origem WAN
+# Mapeamos ambas as portas externas (80/443) para a 80 interna que está ativa no Joomla
+iptables -t nat -A POSTROUTING -o $IF_DMZ -d $SRV_WEB -p tcp --dport 80 -j MASQUERADE
+
+echo "✅ DNAT: Portas 80/443 encaminhando para $SRV_WEB:80 (com retorno via gateway)."
 
 # ==============================================================================
 # 6. NAT: SNAT — Acesso à Internet com RESTRIÇÃO DE HORÁRIO

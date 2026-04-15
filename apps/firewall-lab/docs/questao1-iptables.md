@@ -9,20 +9,47 @@ Atividade: Configuracao de Politica de Firewall
 
 ## Sumario
 
-1. Descricao da Atividade
-2. Topologia de Rede
-3. Tecnologias Utilizadas
-4. Maquina Virtual 1 — Firewall Gateway (Debian 13)
-5. Maquina Virtual 2 — Servidor de Aplicacao Joomla (DMZ)
-6. Maquina Virtual 3 — Servidor de Banco de Dados MySQL (DMZ)
-7. Maquina Virtual 4 — Cliente da Rede Local (Simulacao Windows)
-8. Orquestracao com Docker Compose
-9. Script de Firewall: firewall_iptables.sh
-10. Sincronizacao de Horario com NTP
-11. Testes de Validacao
-12. Script de Auditoria Externa em Python
-13. Resultados Obtidos
-14. Consideracoes Finais
+1. [Descricao da Atividade](#1-descricao-da-atividade)
+2. [Topologia de Rede](#2-topologia-de-rede)
+3. [Tecnologias Utilizadas](#3-tecnologias-utilizadas)
+4. [Maquina Virtual 1 — Firewall Gateway](#4-maquina-virtual-1--firewall-gateway-debian-13)
+   - [4.1 Papel na topologia](#41-papel-na-topologia)
+   - [4.2 Inicializacao do container](#42-inicializacao-do-container)
+   - [4.3 Configuracao privilegiada](#43-configuracao-privilegiada)
+   - [4.4 Verificacao e testes do fw-gateway](#44-como-verificar-o-fw-gateway)
+5. [Maquina Virtual 2 — Servidor Joomla (DMZ)](#5-maquina-virtual-2--servidor-de-aplicacao-joomla-dmz)
+   - [5.1 Papel na topologia](#51-papel-na-topologia)
+   - [5.2 Como o Joomla sobe](#52-como-o-joomla-sobe)
+   - [5.3 Verificacao e testes do Joomla](#53-como-verificar-o-servidor-joomla)
+6. [Maquina Virtual 3 — Servidor MySQL (DMZ)](#6-maquina-virtual-3--servidor-de-banco-de-dados-mysql-dmz)
+   - [6.1 Papel na topologia](#61-papel-na-topologia)
+   - [6.2 Healthcheck do MySQL](#62-healthcheck-do-mysql)
+   - [6.3 Verificacao e testes do MySQL](#63-como-verificar-o-banco-de-dados)
+7. [Maquina Virtual 4 — Cliente Windows (LAN)](#7-maquina-virtual-4--cliente-da-rede-local-simulacao-windows)
+   - [7.1 Papel na topologia](#71-papel-na-topologia)
+   - [7.2 Configuracao de rotas estaticas](#72-configuracao-de-rotas-estaticas)
+   - [7.3 Verificacao e testes do cliente](#73-como-verificar-as-rotas-do-cliente)
+8. [Orquestracao com Docker Compose](#8-orquestracao-com-docker-compose)
+9. [Script de Firewall: firewall_iptables.sh](#9-script-de-firewall-firewall_iptablesh)
+   - [9.1 Deteccao automatica de interfaces](#91-deteccao-automatica-de-interfaces)
+   - [9.2 Habilitacao do roteamento no kernel](#92-habilitacao-do-roteamento-no-kernel)
+   - [9.3 Politica DEFAULT DROP](#93-politica-padrao-default-drop-lista-branca)
+   - [9.4 Conexoes estabelecidas e loopback](#94-regras-de-conexoes-estabelecidas-e-loopback)
+   - [9.5 Protecao ICMP externo](#95-protecao-contra-icmp-externo-ping-of-death-e-reconnaissance)
+   - [9.6 Protecao TCP flags invalidas](#96-protecao-contra-flags-tcp-invalidas)
+   - [9.7 Protecao SYN Flood](#97-protecao-contra-syn-flood)
+   - [9.8 Protecao Port Scan](#98-protecao-contra-port-scan)
+   - [9.9 Source routing e sysctl](#99-desabilitando-source-routing-e-redirects-via-sysctl)
+   - [9.10 DNAT (NAT reverso)](#910-nat-reverso--dnat-acesso-da-internet-ao-joomla)
+   - [9.11 SNAT com restricao de horario](#911-nat-de-saida-com-restricao-de-horario--snat)
+   - [9.12 ACLs de acesso LAN para DMZ](#912-acls-de-acesso-da-lan-para-a-dmz)
+   - [9.13 Regras de saida e NTP](#913-regras-de-saida-do-firewall-e-ntp)
+10. [Sincronizacao de Horario com NTP](#10-sincronizacao-de-horario-com-ntp)
+11. [Testes de Validacao Consolidados](#11-testes-de-validacao)
+12. [Script de Auditoria Externa em Python](#12-script-de-auditoria-externa-em-python)
+13. [Script de Teste Automatizado Completo](#13-script-de-teste-automatizado-completo)
+14. [Resultados Obtidos](#14-resultados-obtidos)
+15. [Consideracoes Finais](#15-consideracoes-finais)
 
 ---
 
@@ -163,6 +190,30 @@ docker exec fw-gateway chronyc sources
 docker exec fw-gateway cat /etc/chrony/chrony.conf
 ```
 
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Verificar se o container esta rodando
+docker inspect -f '{{.State.Running}}' fw-gateway
+# Esperado: true
+
+# T2: Confirmar os tres IPs atribuidos
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' fw-gateway
+# Esperado: 10.100.56.254 10.100.57.254 10.100.90.1 (em qualquer ordem)
+
+# T3: Verificar os processos em execucao dentro do container
+docker exec fw-gateway ps aux
+# Esperado: processar do chronyd ativo
+
+# T4: Confirmar o IP Forwarding habilitado
+docker exec fw-gateway cat /proc/sys/net/ipv4/ip_forward
+# Esperado: 1
+
+# T5: Listar todas as regras do firewall aplicadas
+docker exec fw-gateway iptables -L -n -v --line-numbers 2>&1 | head -40
+# Esperado: politica DROP nas chains INPUT, FORWARD e OUTPUT
+```
+
 ---
 
 ## 5. Maquina Virtual 2 — Servidor de Aplicacao Joomla (DMZ)
@@ -192,6 +243,30 @@ A dependencia `depends_on: db-dmz: condition: service_healthy` garante que o Joo
 docker exec fw-gateway curl -s -o /dev/null -w "%{http_code}" http://10.100.56.10
 
 # Resultado esperado: 302 (redirecionamento para pagina de instalacao do Joomla)
+```
+
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Verificar se o container joomla-dmz esta rodando
+docker inspect -f '{{.State.Running}}' joomla-dmz
+# Esperado: true
+
+# T2: Verificar o IP do Joomla na rede DMZ
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' joomla-dmz
+# Esperado: 10.100.56.10
+
+# T3: Verificar se o Apache esta escutando na porta 80 dentro do container
+docker exec joomla-dmz bash -c "ss -tlnp | grep :80"
+# Esperado: linha com apache2 na porta 80
+
+# T4: Testar acesso HTTP ao Joomla a partir do firewall (atravessa a DMZ)
+docker exec fw-gateway curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://10.100.56.10
+# Esperado: 302
+
+# T5: Verificar logs do Apache dentro do Joomla
+docker exec joomla-dmz tail -5 /var/log/apache2/access.log
+# Esperado: entradas de requisicoes HTTP registradas
 ```
 
 ---
@@ -231,6 +306,30 @@ docker exec db-dmz mysql -u root -prootpassword -e "SHOW DATABASES;"
 # Resultado esperado: aparecer o banco joomla na lista
 ```
 
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Verificar se o container db-dmz esta healthy
+docker inspect -f '{{.State.Health.Status}}' db-dmz
+# Esperado: healthy
+
+# T2: Verificar o IP do MySQL na rede DMZ
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' db-dmz
+# Esperado: 10.100.56.20
+
+# T3: Verificar se o MySQL esta respondendo ao ping de servico
+docker exec db-dmz mysqladmin ping -u root -prootpassword 2>&1
+# Esperado: mysqld is alive
+
+# T4: Listar os bancos de dados criados
+docker exec db-dmz mysql -u root -prootpassword -e "SHOW DATABASES;" 2>&1
+# Esperado: banco joomla na lista
+
+# T5: Verificar usuario do Joomla criado no MySQL
+docker exec db-dmz mysql -u root -prootpassword -e "SELECT user,host FROM mysql.user;" 2>&1
+# Esperado: joomlauser listado
+```
+
 ---
 
 ## 7. Maquina Virtual 4 — Cliente da Rede Local (Simulacao Windows)
@@ -266,6 +365,34 @@ default via 10.100.57.253 dev eth0
 10.100.56.0/24 via 10.100.57.254 dev eth0   <- rota para DMZ pelo firewall
 10.100.57.0/24 dev eth0 proto kernel
 10.100.90.0/24 via 10.100.57.254 dev eth0   <- rota para WAN pelo firewall
+```
+
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Verificar se o container client-win esta rodando
+docker inspect -f '{{.State.Running}}' client-win
+# Esperado: true
+
+# T2: Verificar o IP do cliente na rede LAN
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' client-win
+# Esperado: 10.100.57.30
+
+# T3: Verificar a tabela de rotas atual do cliente
+docker exec client-win ip route show
+# Esperado: rota 10.100.56.0/24 via 10.100.57.254 presente
+
+# T4: Aplicar as rotas caso nao estejam (idempotente - nao causa erro se ja existir)
+docker exec client-win bash -c "ip route add 10.100.56.0/24 via 10.100.57.254 2>/dev/null; ip route add 10.100.90.0/24 via 10.100.57.254 2>/dev/null; echo rotas_ok"
+# Esperado: rotas_ok
+
+# T5: Confirmar que o cliente alcanca o gateway da LAN
+docker exec client-win ping -c 2 -W 2 10.100.57.254
+# Esperado: 2 packets transmitted, 2 received, 0% packet loss
+
+# T6: Confirmar que o cliente alcanca o Joomla na DMZ (via rota pelo firewall)
+docker exec client-win bash -c "timeout 5 bash -c 'echo > /dev/tcp/10.100.56.10/80' && echo PORTA_ABERTA || echo BLOQUEADA"
+# Esperado: PORTA_ABERTA
 ```
 
 ---
@@ -310,6 +437,30 @@ fw-gateway   Up (running)
 joomla-dmz   Up (running)
 db-dmz       Up (healthy)
 client-win   Up (running)
+```
+
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Confirmar status de todos os 4 containers de uma vez
+docker compose ps
+# Esperado: todos com STATUS Up
+
+# T2: Verificar uso de recursos dos containers em tempo real
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+# Esperado: todos listados sem alto consumo de CPU
+
+# T3: Verificar os logs de inicializacao do firewall (procurar por erros)
+docker logs fw-gateway 2>&1 | tail -10
+# Esperado: ver mensagem 'NTP Configurado' e 'fw-gateway pronto!'
+
+# T4: Verificar as redes Docker criadas para o laboratorio
+docker network ls | grep firewall-lab
+# Esperado: firewall-lab_wan_net, firewall-lab_dmz_net, firewall-lab_lan_net
+
+# T5: Inspecionar a rede DMZ e confirmar os IPs dos containers nela
+docker network inspect firewall-lab_dmz_net --format '{{range .Containers}}{{.Name}}: {{.IPv4Address}}{{"\n"}}{{end}}'
+# Esperado: fw-gateway: 10.100.56.254/24 e joomla-dmz: 10.100.56.10/24 e db-dmz: 10.100.56.20/24
 ```
 
 ---
@@ -533,6 +684,59 @@ iptables -A OUTPUT -p icmp -j ACCEPT
 
 Estas regras garantem que o proprio firewall consiga enviar e receber respostas (OUTPUT) e ser administrado via SSH da rede LAN (INPUT na porta 22 apenas pela interface LAN).
 
+### Teste rapido desta secao — validar todas as regras do firewall
+
+```bash
+# T1: Verificar a politica padrao DROP nas 3 chains principais
+docker exec fw-gateway iptables -L -n | grep -E "policy (DROP|ACCEPT)"
+# Esperado: INPUT, FORWARD e OUTPUT todas com policy DROP
+
+# T2: Listar a chain FORWARD completa com contadores de pacotes
+docker exec fw-gateway iptables -L FORWARD -n -v --line-numbers
+# Esperado: policy DROP no topo, regras ACCEPT abaixo para trafego autorizado
+
+# T3: Verificar o DNAT para as portas 80 e 443
+docker exec fw-gateway iptables -t nat -L PREROUTING -n -v
+# Esperado: duas regras DNAT redirecionando portas 80 e 443 para 10.100.56.10
+
+# T4: Verificar o MASQUERADE com restricao de horario
+docker exec fw-gateway iptables -t nat -L POSTROUTING -n -v
+# Esperado: regras MASQUERADE com TIME from 15:00 e TIME from 21:00
+
+# T5: Confirmar que a chain SYNFLOOD existe e esta populada
+docker exec fw-gateway iptables -L SYNFLOOD -n -v
+# Esperado: regra de limit 10/s e regras de LOG e DROP
+
+# T6: Confirmar que a chain PORTSCAN existe
+docker exec fw-gateway iptables -L PORTSCAN -n -v
+# Esperado: regra de LOG e DROP com modulo recent
+
+# T7: Verificar protecao contra flags TCP invalidas
+docker exec fw-gateway iptables -L INPUT -n | grep flags
+# Esperado: duas regras DROP para flags ALL/NONE e ALL/ALL
+
+# T8: Verificar que o ICMP externo esta bloqueado (da WAN)
+docker exec fw-gateway iptables -L INPUT -n -v | grep icmp
+# Esperado: regra DROP para icmptype 8 na interface WAN
+
+# T9: Verificar sysctl — source routing desabilitado
+docker exec fw-gateway sysctl net.ipv4.conf.all.accept_source_route
+# Esperado: net.ipv4.conf.all.accept_source_route = 0
+
+# T10: Verificar sysctl — log de IPs invalidos ativo
+docker exec fw-gateway sysctl net.ipv4.conf.all.log_martians
+# Esperado: net.ipv4.conf.all.log_martians = 1
+
+# T11: Testar ACL do cliente Windows — porta MySQL deve ABRIR
+docker exec client-win bash -c "timeout 5 bash -c 'echo > /dev/tcp/10.100.56.20/3306' && echo ABERTA || echo BLOQUEADA"
+# Esperado: ABERTA (cliente 10.100.57.30 tem permissao na porta 3306)
+
+# T12: Aplicar o firewall manualmente (caso queira resetar as regras)
+docker cp firewall_iptables.sh fw-gateway:/root/firewall_iptables.sh
+docker exec fw-gateway bash -c "bash /root/firewall_iptables.sh > /tmp/fw.log 2>&1; echo RC=$?"
+# Esperado: RC=0
+```
+
 ---
 
 ## 10. Sincronizacao de Horario com NTP
@@ -562,6 +766,34 @@ makestep 1.0 3
 ```
 
 A opcao `iburst` faz o chrony enviar varios pacotes rapidamente na primeira sincronizacao para agilizar o processo. A opcao `makestep 1.0 3` permite ajustes abruptos de relogio nas primeiras tres sincronizacoes, o que e util para corrigir grandes desvios iniciais.
+
+### Teste rapido desta secao (rodar no terminal do host)
+
+```bash
+# T1: Verificar se o chrony esta instalado
+docker exec fw-gateway which chronyd
+# Esperado: /usr/sbin/chronyd
+
+# T2: Verificar o conteudo do arquivo de configuracao
+docker exec fw-gateway cat /etc/chrony/chrony.conf
+# Esperado: linhas com server a.ntp.br, b.ntp.br, c.ntp.br e makestep 1.0 3
+
+# T3: Verificar se o processo chronyd esta em execucao
+docker exec fw-gateway pgrep -x chronyd && echo "CHRONYD RODANDO" || echo "CHRONYD PARADO"
+# Esperado: CHRONYD RODANDO
+
+# T4: Verificar os servidores NTP e seus estados de sincronizacao
+docker exec fw-gateway chronyc sources
+# Esperado: tabela com os servidores NTP listados (pode nao sincronizar em rede isolada)
+
+# T5: Verificar se a porta NTP (123 UDP) esta liberada no firewall para saida
+docker exec fw-gateway iptables -L OUTPUT -n | grep 123
+# Esperado: regra ACCEPT udp dpt:123
+
+# T6: Verificar o offset atual do relogio do container vs. real
+docker exec fw-gateway chronyc tracking
+# Esperado: informacoes sobre offset e fonte de referencia
+```
 
 ---
 

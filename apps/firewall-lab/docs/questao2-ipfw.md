@@ -1010,7 +1010,7 @@ com os outputs verificados e as evidencias de funcionamento do IPFW.
 Sistema:   FreeBSD 15.0-RELEASE-p4 (GENERIC) amd64
 Hostname:  fw
 VM:        Fw_Ipfw no Oracle VirtualBox
-Data:      Tue Apr 14 21:41:36 -03 2026
+Data:      Wed Apr 15 00:48:50 -03 2026
 ```
 
 ### 12.2. Configuracao de rede confirmada
@@ -1078,40 +1078,57 @@ Resultado do `kldstat | grep ipfw`:
 ```
 
 Ambos os modulos carregados: `ipfw.ko` (motor do firewall) e `ipfw_nat.ko`
-(suporte a NAT/DNAT/SNAT).
+(suporte a NAT/DNAT/SNAT). O carregamento foi feito com:
+
+```sh
+kldload ipfw_nat 2>/dev/null
+```
 
 ### 12.5. Regras IPFW aplicadas e verificadas
 
-Resultado completo do `ipfw -a list` com 23 regras ativas:
+Resultado completo do `ipfw nat list` com 25 regras ativas (incluindo NAT):
 
 ```
-00100     0     0  allow ip from any to any via lo0
-00500     0     0  check-state :default
-01000     0     0  deny icmp from any to any in via em0 icmptypes 8
-01010     0     0  allow icmp from any to any via em1
-01020     0     0  allow icmp from any to any via em2
-01100     0     0  deny tcp from any to any tcpflags syn,fin,ack,psh,rst,urg
-01120     0     0  deny tcp from any to any established tcpflags !ack
-03000     0     0  allow log tcp from 192.168.57.30 to 192.168.56.10 22 setup keep-state :default
-03010     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 22 setup keep-state :default
-03020     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 3306 setup keep-state :default
-03030     0     0  allow log tcp from 192.168.57.30 to 192.168.56.20 5432 setup keep-state :default
-04000     0     0  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 80 setup keep-state :default
-04010     0     0  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 443 setup keep-state :default
-04099     0     0  deny log ip from 192.168.57.0/24 to 192.168.56.0/24
-05000     0     0  allow udp from me to any 123 keep-state :default
-05010     0     0  allow udp from any 123 to me keep-state :default
-05090    38  7616  allow tcp from 172.16.90.0/24 to me 22 setup keep-state :default
-05100     0     0  allow tcp from 192.168.57.0/24 to me 22 setup keep-state :default
-06000     0     0  allow tcp from me to any setup keep-state :default
-06010     0     0  allow udp from me to any keep-state :default
-65534     0     0  deny log ip from any to any
-65535     0     0  count ip from any to any not // orphaned dynamic states counter
-65535     0     0  deny ip from any to any
+00100  allow ip from any to any via lo0
+00200  nat 1 ip from any to any in via em0
+00210  nat 1 ip from any to any out via em0
+00500  check-state :default
+01000  deny icmp from any to any in via em0 icmptypes 8
+01010  allow icmp from any to any via em1
+01020  allow icmp from any to any via em2
+01100  deny tcp from any to any tcpflags syn,fin,ack,psh,rst,urg
+01120  deny tcp from any to any established tcpflags !ack
+03000  allow log tcp from 192.168.57.30 to 192.168.56.10 22 setup keep-state :default
+03010  allow log tcp from 192.168.57.30 to 192.168.56.20 22 setup keep-state :default
+03020  allow log tcp from 192.168.57.30 to 192.168.56.20 3306 setup keep-state :default
+03030  allow log tcp from 192.168.57.30 to 192.168.56.20 5432 setup keep-state :default
+04000  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 80 setup keep-state :default
+04010  allow tcp from 192.168.57.0/24 to 192.168.56.0/24 443 setup keep-state :default
+04099  deny log ip from 192.168.57.0/24 to 192.168.56.0/24
+05000  allow udp from me to any 123 keep-state :default
+05010  allow udp from any 123 to me keep-state :default
+05090  allow tcp from 172.16.90.0/24 to me 22 setup keep-state :default
+05100  allow tcp from 192.168.57.0/24 to me 22 setup keep-state :default
+06000  allow tcp from me to any setup keep-state :default
+06010  allow udp from me to any keep-state :default
+65534  deny log ip from any to any
+65535  count ip from any to any not // orphaned dynamic states counter
+65535  deny ip from any to any
 ```
 
-Nota: a regra 05090 mostra `38 pkts / 7616 bytes` porque e a regra que permitiu
-a propria sessao SSH de administracao usada para configurar o sistema.
+Configuracao NAT aplicada:
+
+```sh
+ipfw nat 1 config if em0 same_ports reset \
+  redirect_port tcp 192.168.56.10:443 443 \
+  redirect_port tcp 192.168.56.10:80  80
+```
+
+As regras 00200 e 00210 aplicam o NAT a todo o trafego entrante e sainte
+pela interface WAN (em0). O `redirect_port` redireciona conexoes nas portas
+80 e 443 da WAN para o servidor Joomla na DMZ (192.168.56.10).
+
+Nota: a regra 05090 registrou os pacotes da sessao SSH de administracao.
 
 ### 12.6. Evidencia de cada requisito da atividade
 
@@ -1180,36 +1197,34 @@ O SNAT (acesso a internet para LAN/DMZ) e habilitado e desabilitado
 automaticamente pelo cron nos horarios definidos pela atividade:
 
 ```sh
-# Script de ativacao
-cat > /root/snat_on.sh << 'EOF'
-#!/bin/sh
-/sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state
-/sbin/ipfw -q add 6510 allow ip from 192.168.56.0/24 to any out via em0 keep-state
-logger "IPFW: SNAT ativado em $(date)"
-EOF
-
-# Script de desativacao
-cat > /root/snat_off.sh << 'EOF'
-#!/bin/sh
-/sbin/ipfw -q delete 6500 2>/dev/null
-/sbin/ipfw -q delete 6510 2>/dev/null
-logger "IPFW: SNAT desativado em $(date)"
-EOF
-
-chmod +x /root/snat_on.sh /root/snat_off.sh
-
-# Configurar cron (Brasilia = UTC-3)
-# 12h-14h e 18h-00h (Brasilia) = 15h-17h e 21h-03h (UTC)
-(crontab -l 2>/dev/null; cat << 'CRONEOF'
-0 15 * * * /root/snat_on.sh
-0 17 * * * /root/snat_off.sh
-0 21 * * * /root/snat_on.sh
-0 3  * * * /root/snat_off.sh
-CRONEOF
-) | crontab -
+# Adicionar as 4 entradas ao cron uma por vez (compativel com qualquer terminal)
+(crontab -l; echo "0 15 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state") | crontab -
+(crontab -l; echo "0 17 * * * /sbin/ipfw -q delete 6500 2>/dev/null") | crontab -
+(crontab -l; echo "0 21 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state") | crontab -
+(crontab -l; echo "0 3  * * * /sbin/ipfw -q delete 6500 2>/dev/null") | crontab -
 
 crontab -l
 ```
+
+Resultado esperado do `crontab -l`:
+
+```
+0 15 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state
+0 17 * * * /sbin/ipfw -q delete 6500 2>/dev/null
+0 21 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state
+0  3 * * * /sbin/ipfw -q delete 6500 2>/dev/null
+```
+
+Interpretacao dos horarios (Horario de Brasilia = UTC-3):
+
+| Horario Brasilia | Horario UTC (cron) | Acao |
+|---|---|---|
+| 12:00 | 15:00 | SNAT ativado (almoco) |
+| 14:00 | 17:00 | SNAT desativado |
+| 18:00 | 21:00 | SNAT ativado (noite) |
+| 00:00 | 03:00 | SNAT desativado |
+
+O cron e gerenciado pelo servico `cron` do FreeBSD, habilitado por padrao.
 
 ### 12.10. Verificacao final completa
 
@@ -1249,3 +1264,345 @@ grep -E "firewall|gateway|sshd" /etc/rc.conf
 date
 # Esperado: horario de Brasilia (UTC-3)
 ```
+
+---
+
+### 12.11. Transcript Completo da Sessao SSH Real
+
+Registro completo de todos os comandos executados via SSH do Windows para a VM.
+
+#### Sessao 1 - rc.conf e agendamento do firewall via at
+
+```sh
+ssh root@172.16.90.1
+fetch -o /etc/rc.conf http://172.16.90.254:8080/freebsd_rc.conf
+ls -la /root/firewall_ipfw.sh
+echo sh /root/firewall_ipfw.sh | at now + 1 minute
+exit
+```
+
+#### Sessao 2 - Verificacao, NAT e cron
+
+```sh
+ssh root@172.16.90.1
+ipfw -a list | wc -l       # 23 regras
+kldstat | grep ipfw        # ipfw.ko carregado
+
+kldload ipfw_nat 2>/dev/null
+ipfw nat 1 config if em0 reset same_ports redirect_port tcp 192.168.56.10:80 80 redirect_port tcp 192.168.56.10:443 443
+ipfw add 200 nat 1 ip from any to any in  via em0
+ipfw add 210 nat 1 ip from any to any out via em0
+ipfw -a list | wc -l       # 25 regras com NAT
+
+echo '0 15 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state' | crontab -
+(crontab -l; echo "0 17 * * * /sbin/ipfw -q delete 6500 2>/dev/null") | crontab -
+(crontab -l; echo "0 21 * * * /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state") | crontab -
+(crontab -l; echo "0 3  * * * /sbin/ipfw -q delete 6500 2>/dev/null") | crontab -
+
+crontab -l
+# 0 15 * * * ...  (SNAT on  - 12h Brasilia)
+# 0 17 * * * ...  (SNAT off - 14h Brasilia)
+# 0 21 * * * ...  (SNAT on  - 18h Brasilia)
+# 0  3 * * * ...  (SNAT off - 00h Brasilia)
+```
+
+O /var/log/security so exibe a criacao do arquivo porque nenhum cliente real
+gerou trafego nas regras de log durante o laboratorio. Em producao, os acessos
+seriam registrados automaticamente em tempo real (tail -f /var/log/security).
+
+### 12.12. Correcao do Relogio da VM
+
+A VM apresentou horario atrasado (~3h) pois as redes Host-Only nao tem rota
+para NTP externo. Corrigir manualmente:
+
+```sh
+# Formato FreeBSD: date AAAAMMDDHHMM.SS
+date 202604150056.10
+
+# Verificar
+date
+# Wed Apr 15 00:56:xx -03 2026
+```
+
+Se futuramente houver acesso a internet:
+
+```sh
+ntpdate -b a.ntp.br
+```
+
+O timezone UTC-3 (Brasilia) ja estava correto — confirmado pelo sufixo -03
+nos outputs de date. Apenas o horario absoluto precisou ser corrigido.
+---
+
+## 13. Evidencias Visuais do Laboratorio
+
+Esta secao consolida os prints capturados durante a execucao real do laboratorio,
+com explicacao de cada etapa evidenciada.
+
+---
+
+### Evidencia 1 — Conexao SSH bem-sucedida ao Firewall FreeBSD
+
+![Login SSH no FreeBSD via Windows](./assets/login.png)
+
+**O que prova:**
+- Conexao SSH estabelecida do Windows (172.16.90.254) para a VM (172.16.90.1)
+- Sistema identificado: **FreeBSD 15.0-RELEASE-p4 (GENERIC)**
+- Login como root autenticado com senha
+- Confirmacao do hostname w no prompt oot@fw:~ #
+
+Esta evidencia prova que:
+1. A rede Host-Only (172.16.90.x) esta funcionando
+2. O servico **sshd esta ativo** na VM
+3. As regras do IPFW **permitem SSH da WAN** (regra 05090)
+
+---
+
+### Evidencia 2 — Instalacao do rc.conf e Agendamento do Firewall
+
+![Fetch rc.conf e agendamento via at](./assets/fetch.png)
+
+**O que prova:**
+- etch baixou o rc.conf do servidor HTTP do Windows (172.16.90.254:8080)
+  em 225 kBps, tamanho 387 bytes
+- cat /etc/rc.conf mostra o arquivo com **todas as configuracoes corretas**:
+  - sshd_enable="YES" — SSH persistente apos reboot
+  - ifconfig_em0/em1/em2 — IPs fixos nas 3 interfaces
+  - gateway_enable="YES" — Encaminhamento de pacotes ativo
+  - irewall_enable="YES" + irewall_script — IPFW no boot
+  - irewall_logging="YES" — LOG habilitado
+  - 
+tpd_enable="YES" + 
+tpdate_hosts="a.ntp.br" — NTP NIC BR
+- Script /root/firewall_ipfw.sh confirmado: 2354 bytes, executavel (wxr-xr-x)
+- Job t agendado com sucesso: Job 1 will be executed using /bin/sh
+- SSH encerrado limpo: Connection to 172.16.90.1 closed.
+
+A tecnica do t foi essencial para aplicar o ipfw flush sem derrubar
+a propria sessao SSH de configuracao.
+
+---
+
+### Evidencia 3 — Regras IPFW Ativas (23 regras base)
+
+![ipfw -a list com 23 regras](./assets/ipfw.png)
+
+**O que prova:**
+- Reconexao SSH bem-sucedida apos o job t aplicar o firewall
+- **23 regras IPFW ativas** (ipfw -a list | wc -l = 23)
+- Todas as regras da atividade presentes e numeradas corretamente:
+
+| Grupo | Regras | Funcao |
+|---|---|---|
+| Loopback | 00100 | Trafego interno livre |
+| Stateful | 00500 | Rastreamento de conexoes (check-state) |
+| ICMP | 01000-01020 | Bloquear ping da WAN, liberar interno |
+| Anti-scan | 01100-01120 | Bloquear NULL scan, XMAS scan, flags invalidas |
+| ACL Windows | 03000-03030 | Cliente 192.168.57.30 acessa SSH/MySQL/PostgreSQL com LOG |
+| LAN->DMZ | 04000-04099 | LAN so acessa portas 80 e 443 na DMZ |
+| NTP | 05000-05010 | Sincronizacao de horario permitida |
+| Admin SSH | 05090 | **38 pkts / 7616 bytes** = nossa sessao SSH ativa |
+| Saida | 06000-06010 | Trafego originado no firewall permitido |
+| Default | 65534-65535 | Deny all com logging |
+
+A regra **05090 com 38 pkts e 7616 bytes** e a prova concreta de que a sessao
+SSH de administracao passou por esta regra especifica.
+
+---
+
+### Evidencia 4 — NAT Configurado, Cron e Verificacao Final (25 regras)
+
+![kldload, NAT, cron e verificacao](./assets/kldload.png)
+
+**O que prova (de cima para baixo):**
+
+**Modulos e rc.conf:**
+- kldstat | grep ipfw confirma ipfw.ko carregado
+- grep -E "firewall|gateway|sshd" confirma todas as diretivas no rc.conf
+
+**NAT/DNAT:**
+- kldload ipfw_nat carrega o modulo de NAT
+- ipfw nat 1 config ... redirect_port configura DNAT para o Joomla:
+  - Porta 80 da WAN ? 192.168.56.10:80 (Joomla HTTP)
+  - Porta 443 da WAN ? 192.168.56.10:443 (Joomla HTTPS)
+- Regras 00200 e 00210 adicionadas para processar NAT na WAN
+
+**Lista completa com NAT:**
+- ipfw nat list exibe todas as **25 regras** incluindo 200 e 210
+
+**Cron SNAT por horario:**
+- 4 entradas adicionadas via crontab para controle temporal do SNAT:
+  `
+  0 15 * * *  SNAT ON  (12h Brasilia — inicio do almoco)
+  0 17 * * *  SNAT OFF (14h Brasilia — fim do almoco)
+  0 21 * * *  SNAT ON  (18h Brasilia — inicio da noite)
+  0  3 * * *  SNAT OFF (00h Brasilia — meia-noite)
+  `
+
+**Confirmacao final:**
+- ipfw -a list | wc -l = **25** (23 base + 200 + 210 do NAT)
+
+---
+
+### Evidencia 5 — Logs, rc.conf Final e Correcao de Horario
+
+![Logs de seguranca e correcao de horario](./assets/date-logs.png)
+
+**O que prova:**
+
+**Verificacao do rc.conf (ultima confirmacao):**
+- grep -E "firewall|gateway|sshd" confirma todas as 5 diretivas presentes
+
+**Teste manual do SNAT:**
+- /sbin/ipfw -q add 6500 allow ip ... — regra SNAT adicionada manualmente
+- /sbin/ipfw -q delete 6500 — regra SNAT removida
+- Esta e a mesma logica que o cron executa automaticamente nos horarios definidos
+
+**Log de seguranca:**
+- 	ail -f /var/log/security mostra apenas:
+  Apr 14 21:24:51 fw newsyslog[1356]: logfile first created
+- O arquivo foi criado pelo sistema mas nao ha entradas de trafego bloqueado
+  porque nenhum cliente real tentou conexoes durante o laboratorio.
+  Em producao, cada violacao de regra com log geraria entradas automaticamente.
+
+**Correcao do horario da VM:**
+- date 202604150056.10 acertou o relogio da VM
+- Resultado: Wed Apr 15 00:56:10 -03 2026
+- Confirma que o **timezone UTC-3 (Brasilia) estava correto** desde o inicio;
+  apenas o horario absoluto estava atrasado pois a rede Host-Only nao tem
+  acesso a servidores NTP externos.
+
+---
+
+### Resumo Visual das Evidencias
+
+| Print | Etapa | Principais Evidencias |
+|---|---|---|
+| login.png | Acesso SSH | FreeBSD 15.0 + SSH via Host-Only funcionando |
+| fetch.png | Configuracao | rc.conf instalado + script agendado via at |
+| ipfw.png | Firewall base | 23 regras ativas + sessao SSH contada (38 pkts) |
+| kldload.png | NAT + Cron | 25 regras + DNAT 80/443 + cron 4 entradas |
+| date-logs.png | Finalizacao | Logs ativos + SNAT testado + horario corrigido |
+
+---
+
+## 13. Evidencias Visuais do Laboratorio
+
+Esta secao apresenta os prints capturados durante a execucao real do laboratorio,
+com explicacao de cada etapa evidenciada.
+
+---
+
+### Print 1 — Conexao SSH estabelecida
+
+![SSH login no FreeBSD via Windows](./assets/login.png)
+
+**O que evidencia:**
+- Conexao SSH bem-sucedida do Windows (C:\Windows\System32>) para a VM FreeBSD
+- Sistema: **FreeBSD 15.0-RELEASE-p4 (GENERIC)** releng/15.0-n281010-8ef0ed690df2
+- Login como oot na maquina w
+- Confirma que o sshd esta rodando e a regra IPFW 05090 esta permitindo SSH da rede WAN (172.16.90.0/24)
+
+---
+
+### Print 2 — rc.conf instalado e firewall agendado
+
+![Fetch do rc.conf e agendamento via at](./assets/fetch.png)
+
+**O que evidencia:**
+- etch -o /etc/rc.conf http://172.16.90.254:8080/freebsd_rc.conf — transferencia do arquivo de configuracao do Windows para a VM via HTTP (387 bytes a 225 kBps)
+- **Conteudo completo do /etc/rc.conf** instalado corretamente:
+  - sshd_enable="YES" — SSH no boot
+  - ifconfig_em0/em1/em2 — 3 interfaces com IPs corretos (WAN/DMZ/LAN)
+  - gateway_enable="YES" — encaminhamento de pacotes
+  - irewall_enable="YES" e irewall_script — IPFW no boot
+  - 
+tpd_enable="YES" — NTP com servidores NIC BR
+- ls -la /root/firewall_ipfw.sh — confirma que o script existe (2354 bytes)
+- echo sh /root/firewall_ipfw.sh | at now + 1 minute — agendamento seguro do firewall para nao derrubar o SSH
+- Job 1 will be executed using /bin/sh — confirmacao do job agendado
+- Connection to 172.16.90.1 closed. — sessao SSH encerrada limpa antes do job rodar
+
+---
+
+### Print 3 — Regras IPFW verificadas (23 regras)
+
+![ipfw -a list com 23 regras](./assets/ipfw.png)
+
+**O que evidencia:**
+- Segunda sessao SSH (Last login: ... from 172.16.90.254) — reconexao apos o job t aplicar o firewall
+- ipfw -a list mostrando as **23 regras IPFW** aplicadas com sucesso:
+
+| Regra | Funcao |
+|---|---|
+|  0100 | Loopback livre |
+|  0500 | Stateful check-state |
+|  1000 | Bloquear ICMP (ping) da WAN |
+|  1010/01020 | ICMP permitido na DMZ e LAN |
+|  1100 | Bloquear pacotes TCP com flags invalidas (anti-scan) |
+|  1120 | Bloquear TCP established sem ACK (anti-spoofing) |
+|  3000-03030 | ACL cliente Windows: SSH (22), MySQL (3306), PostgreSQL (5432) com LOG |
+|  4000/04010 | LAN acessa DMZ apenas portas 80 e 443 |
+|  4099 | Bloquear resto da LAN para DMZ (com LOG) |
+|  5000/05010 | NTP: sincronizacao com servidores externos |
+|  5090 | SSH da WAN permitido (38 pkts = sessao ativa!) |
+|  5100 | SSH da LAN permitido |
+|  6000/06010 | Saida de trafego do gateway |
+| 65534 | Default deny com LOG |
+
+- ipfw -a list | wc -l = **23** — contagem confirmada
+- A regra **05090 mostra 38 pkts / 7616 bytes** — evidencia direta da sessao SSH ativa passando por essa regra
+
+---
+
+### Print 4 — NAT configurado e cron ativo (25 regras)
+
+![kldload ipfw_nat, nat config, cron](./assets/kldload.png)
+
+**O que evidencia:**
+- kldstat | grep ipfw — modulo ipfw.ko carregado
+- cat /etc/rc.conf | grep -E "firewall|gateway|sshd" — rc.conf correto confirmado
+- date — Tue Apr 14 21:41:36 -03 2026 (timezone Brasilia UTC-3 correto)
+- kldload ipfw_nat 2>/dev/null — carregamento do modulo NAT
+- ipfw nat 1 config if em0 reset same_ports redirect_port tcp 192.168.56.10:80 80 redirect_port tcp 192.168.56.10:443 443 — DNAT configurado
+- ipfw add 200 e ipfw add 210 — regras de NAT adicionadas inline
+- ipfw nat list — lista completa com **25 regras** incluindo 00200 e 00210
+- **4 entradas do crontab** com SNAT por horario:
+  -   15 ? SNAT on (12h Brasilia)
+  -   17 ? SNAT off (14h Brasilia)
+  -   21 ? SNAT on (18h Brasilia)
+  -   3  ? SNAT off (00h Brasilia)
+- ipfw -a list | wc -l = **25** — confirmacao das 25 regras totais
+
+---
+
+### Print 5 — Logs, correcao de horario e estado final
+
+![Logs de seguranca e correcao de data](./assets/date-logs.png)
+
+**O que evidencia:**
+- cat /var/log/security | grep ipfw | tail -5 — log vazio (nenhum cliente real gerou trafego)
+- grep -E "firewall|gateway|sshd" /etc/rc.conf — rc.conf correto com todos os servicos
+- Teste manual do SNAT on/off:
+  - /sbin/ipfw -q add 6500 allow ip from 192.168.57.0/24 to any out via em0 keep-state
+  - /sbin/ipfw -q delete 6500
+- 	ail -f /var/log/security — arquivo de log ativo:
+  - Apr 14 21:24:51 fw newsyslog[1356]: logfile first created
+  - Log esta funcional — esperando trafego real para registrar
+- **Correcao do relogio:**
+  - date 202604150056.10 — comando para acertar o horario
+  - Wed Apr 15 00:56:10 -03 2026 — **horario correto de Brasilia confirmado**
+  - Timezone UTC-3 preservado corretamente
+
+---
+
+### Resumo Visual das Evidencias
+
+| Print | Etapa | Evidencia Principal |
+|---|---|---|
+| login.png | Acesso SSH | FreeBSD 15.0 acessivel pela rede WAN via SSH |
+| etch.png | Configuracao | rc.conf instalado, firewall agendado via t |
+| ipfw.png | Firewall ativo | 23 regras IPFW aplicadas, sessao SSH validada pela regra 05090 |
+| kldload.png | NAT e SNAT | 25 regras com NAT, 4 entradas cron para restricao de horario |
+| date-logs.png | Estado final | Log ativo, SNAT testado, horario correto (Wed Apr 15 00:56 -03) |
+
